@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  id          Int      @id @default(autoincrement())
+  name        String
+  title       String
+  bio         String
+  email       String
+  location    String?
+  avatarUrl   String?
+  socialLinks Json?    // GitHub, LinkedIn, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  imageUrl    String?
+  techStack   String[] // Array of strings: ["Next.js", "NestJS"]
+  demoUrl     String?
+  repoUrl     String?
+  featured    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Skill {
+  id          Int      @id @default(autoincrement())
+  name        String
+  category    String   // "Frontend", "Backend", "AI", "Cloud"
+  level       Int      // 0-100
+  icon        String?  // Nombre del icono o URL
+}
+
+model Experience {
+  id          Int      @id @default(autoincrement())
+  role        String
+  company     String
+  startDate   DateTime
+  endDate     DateTime?
+  description String
+  current     Boolean  @default(false)
+}
