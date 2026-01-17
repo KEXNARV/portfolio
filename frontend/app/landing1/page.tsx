@@ -743,7 +743,7 @@ export default function Landing1() {
         {/* --- Hero Section with Parallax + Glitch --- */}
         <motion.section
           id="hero"
-          className="min-h-[90vh] flex flex-col justify-center mb-20 relative"
+          className="min-h-[80vh] flex flex-col justify-center mb-20 relative pt-8"
           style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
         >
           <div className="max-w-5xl">
