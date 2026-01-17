@@ -262,6 +262,108 @@ const StaggerItem = ({ children, className }: { children: React.ReactNode; class
 );
 
 // ============================================================================
+// GEMINI ANIMATION COMPONENTS
+// ============================================================================
+
+// --- Glitch Reveal Effect ---
+const GlitchReveal = ({ children, delay = 0 }: { children: React.ReactNode, delay?: number }) => {
+  const animationParams = React.useMemo(() => {
+    const steps = Math.floor(Math.random() * 6) + 4;
+    const keyframesOpacity = [0];
+    const keyframesFilter = ["brightness(1)"];
+    const times = [0];
+
+    let currentTime = 0;
+
+    for (let i = 0; i < steps; i++) {
+      const isVisible = Math.random() > 0.5;
+      const brightness = isVisible ? (Math.random() * 2 + 1) : 0;
+      const duration = Math.random() * 0.2 + 0.05;
+
+      keyframesOpacity.push(isVisible ? (Math.random() * 0.5 + 0.5) : 0);
+      keyframesFilter.push(`brightness(${brightness})`);
+
+      currentTime += duration;
+      times.push(currentTime);
+    }
+
+    keyframesOpacity.push(1);
+    keyframesFilter.push("brightness(1)");
+    times.push(currentTime + 0.1);
+
+    const totalDuration = times[times.length - 1];
+    const normalizedTimes = times.map(t => t / totalDuration);
+
+    return {
+      opacity: keyframesOpacity,
+      filter: keyframesFilter,
+      times: normalizedTimes,
+      duration: totalDuration + (Math.random() * 1.0)
+    };
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: animationParams.opacity,
+        filter: animationParams.filter
+      }}
+      transition={{
+        duration: animationParams.duration,
+        delay: delay + Math.random() * 0.5,
+        times: animationParams.times
+      }}
+      className="relative"
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+// --- Data Ticker ---
+const DataTicker = () => {
+  const items = [
+    "SYS_OP: NORMAL", "MEM_ALLOC: 64TB", "NET_LATENCY: 12ms",
+    "ENCRYPTION: AES-4096", "AI_CORE: ONLINE", "NEURAL_LINK: ACTIVE",
+    "TARGET: PRODUCTION", "UPTIME: 99.999%", "BUILD: v2.0.26"
+  ];
+
+  return (
+    <div className="w-full overflow-hidden bg-[#FF3B30]/5 border-y border-[#FF3B30]/10 py-2 relative select-none">
+      <div className="absolute inset-0 bg-gradient-to-r from-[#030303] via-transparent to-[#030303] z-10" />
+      <motion.div
+        className="flex whitespace-nowrap gap-8"
+        animate={{ x: [0, -1000] }}
+        transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
+      >
+        {[...items, ...items, ...items].map((item, i) => (
+          <div key={i} className={cn("text-[10px] text-[#FF3B30]/70 font-mono tracking-widest flex items-center gap-2", spaceMono.className)}>
+            <span className="w-1 h-1 bg-[#FF3B30]/50" />
+            {item}
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+};
+
+// --- Background Grid with Big Glow ---
+const BackgroundGrid = () => (
+  <div className="fixed inset-0 pointer-events-none z-0">
+    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+    <motion.div
+      className="absolute left-0 right-0 top-[-200px] -z-10 m-auto h-[800px] w-[800px] rounded-full bg-[#FF3B30] opacity-[0.15] blur-[140px]"
+      animate={{
+        scale: [1, 1.1, 1],
+        opacity: [0.15, 0.2, 0.15]
+      }}
+      transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+    />
+  </div>
+);
+
+// ============================================================================
 // ANIMATION COMPONENTS
 // ============================================================================
 
@@ -348,7 +450,7 @@ const IndustrialButton = ({
   variant?: "primary" | "ghost" | "outline";
 }) => {
   const variants = {
-    primary: "bg-[#FF3B30] text-white hover:bg-[#ff5d53] shadow-[0_0_20px_-5px_#FF3B30]",
+    primary: "bg-[#FF3B30] text-white hover:bg-[#ff5d53] border border-transparent shadow-[0_0_20px_-5px_#FF3B30]",
     ghost: "bg-transparent text-neutral-400 hover:text-white hover:bg-white/5",
     outline: "bg-transparent border border-neutral-700 text-neutral-100 hover:border-[#FF3B30] hover:text-[#FF3B30]"
   };
@@ -358,12 +460,16 @@ const IndustrialButton = ({
       href={href}
       className={cn(
         "group relative px-6 py-3 uppercase tracking-widest text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2",
+        "[clip-path:polygon(0_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%)]",
         variants[variant],
         spaceMono.className,
         className
       )}
     >
       <span className="relative z-10 flex items-center gap-2">{children}</span>
+      {variant === 'outline' && (
+        <div className="absolute inset-0 bg-[#FF3B30]/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+      )}
     </MagneticButton>
   );
 };
@@ -583,19 +689,7 @@ export default function Landing1() {
     >
       <ScrollProgressBar />
       <NoiseOverlay />
-
-      {/* Animated Background Grid */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:48px_48px]" />
-        <motion.div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#FF3B30] opacity-[0.03] blur-[150px]"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.03, 0.05, 0.03]
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
+      <BackgroundGrid />
 
       {/* --- Navigation with scroll indicator --- */}
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-[#030303]/80 backdrop-blur-md">
@@ -646,15 +740,15 @@ export default function Landing1() {
 
       <main className="container mx-auto px-6 pt-32 pb-20 relative z-10">
 
-        {/* --- Hero Section with Parallax --- */}
+        {/* --- Hero Section with Parallax + Glitch --- */}
         <motion.section
           id="hero"
           className="min-h-[90vh] flex flex-col justify-center mb-20 relative"
           style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
         >
           <div className="max-w-5xl">
-            {/* Boot sequence */}
-            <RevealOnScroll direction="left" delay={0.2}>
+            {/* Boot sequence with Glitch */}
+            <GlitchReveal delay={0.2}>
               <div className={cn("flex items-center gap-3 mb-6 text-[#FF3B30] text-xs md:text-sm uppercase tracking-[0.25em]", spaceMono.className)}>
                 <motion.span
                   className="w-2 h-2 bg-[#FF3B30] shadow-[0_0_10px_#FF3B30]"
@@ -665,25 +759,31 @@ export default function Landing1() {
                 <span className="w-8 h-[1px] bg-[#FF3B30]/50" />
                 <span className="text-neutral-500">v2.0.26</span>
               </div>
-            </RevealOnScroll>
+            </GlitchReveal>
 
-            {/* Main Headline with stagger */}
-            <StaggerContainer className="mb-8" staggerDelay={0.15}>
+            {/* Main Headline with Glitch + stagger */}
+            <div className="mb-8">
               <h1 className="text-5xl md:text-8xl lg:text-9xl font-extrabold tracking-tighter leading-[0.9] text-neutral-100 uppercase">
-                <StaggerItem>
+                <GlitchReveal delay={0.5}>
                   <span className="block">Building</span>
-                </StaggerItem>
-                <StaggerItem>
-                  <span className="block text-neutral-600">The Digital</span>
-                </StaggerItem>
-                <StaggerItem>
+                </GlitchReveal>
+                <GlitchReveal delay={0.8}>
+                  <span className="block text-transparent bg-clip-text bg-cover bg-center"
+                        style={{
+                          backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E\"), linear-gradient(to right, #737373, #ffffff)",
+                          backgroundBlendMode: "overlay"
+                        }}>
+                    <ScrambleText text="The Digital" delay={1.0} />
+                  </span>
+                </GlitchReveal>
+                <GlitchReveal delay={1.1}>
                   <span className="block">Cortex.</span>
-                </StaggerItem>
+                </GlitchReveal>
               </h1>
-            </StaggerContainer>
+            </div>
 
             {/* Subtext and CTA */}
-            <RevealOnScroll direction="up" delay={0.8}>
+            <GlitchReveal delay={1.8}>
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 border-l-2 border-[#FF3B30]/20 pl-6 md:border-none md:pl-0">
                 <p className="max-w-xl text-lg md:text-xl text-neutral-400 leading-relaxed font-light">
                   <span className="text-white font-medium">{profile.role}</span> specializing in bridging high-dimensional AI models with scalable, production-grade infrastructure.
@@ -698,15 +798,25 @@ export default function Landing1() {
                   </IndustrialButton>
                 </div>
               </div>
-            </RevealOnScroll>
+            </GlitchReveal>
           </div>
+
+          {/* Data Ticker at bottom of Hero */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 2.5, duration: 1 }}
+            className="absolute bottom-20 left-0 right-0 z-20"
+          >
+            <DataTicker />
+          </motion.div>
 
           {/* Scroll indicator */}
           <motion.div
-            className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 2 }}
+            transition={{ delay: 3 }}
           >
             <span className={cn("text-[10px] text-neutral-600 uppercase tracking-[0.3em]", spaceMono.className)}>
               Scroll to explore
