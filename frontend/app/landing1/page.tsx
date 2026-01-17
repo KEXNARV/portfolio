@@ -1,29 +1,305 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Manrope, Space_Mono } from "next/font/google";
-import { motion } from "framer-motion";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+  useInView,
+  useMotionValue,
+  useAnimationFrame
+} from "framer-motion";
 import {
   ArrowUpRight,
   Terminal,
   ExternalLink,
   Github,
-  Mail,
   Linkedin,
   ChevronRight,
-  Activity,
-  Shield,
-  Zap
+  Cpu,
+  Server,
+  Database,
+  Code2,
+  Globe,
+  ArrowDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useArrivalSound } from "@/hooks/use-arrival-sound";
 import { projects, skills, profile, type Project } from "@/data/projects";
 
-// --- Fuentes ---
-const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "800"] });
+// --- Typography ---
+const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "700", "800"] });
 const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"] });
 
-// --- Componentes UI ---
+// ============================================================================
+// SCROLL-BASED HOOKS & COMPONENTS
+// ============================================================================
+
+// --- Scroll Progress Bar ---
+const ScrollProgressBar = () => {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+
+  return (
+    <motion.div
+      className="fixed top-0 left-0 right-0 h-[2px] bg-[#FF3B30] origin-left z-[100]"
+      style={{ scaleX }}
+    />
+  );
+};
+
+// --- Animated Counter ---
+const AnimatedCounter = ({
+  value,
+  suffix = "",
+  duration = 2
+}: {
+  value: number;
+  suffix?: string;
+  duration?: number;
+}) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) return;
+
+    let startTime: number;
+    let animationFrame: number;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
+
+      // Easing function for smooth finish
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(Math.floor(easeOut * value));
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [isInView, value, duration]);
+
+  return <span ref={ref}>{displayValue}{suffix}</span>;
+};
+
+// --- Parallax Text ---
+const ParallaxText = ({
+  children,
+  baseVelocity = 5,
+  className
+}: {
+  children: React.ReactNode;
+  baseVelocity?: number;
+  className?: string;
+}) => {
+  const baseX = useMotionValue(0);
+  const { scrollY } = useScroll();
+  const scrollVelocity = useTransform(scrollY, [0, 1000], [0, baseVelocity * 10]);
+  const smoothVelocity = useSpring(scrollVelocity, { damping: 50, stiffness: 400 });
+
+  const x = useTransform(baseX, (v) => `${v}%`);
+
+  useAnimationFrame((_, delta) => {
+    let moveBy = baseVelocity * (delta / 1000);
+    moveBy += smoothVelocity.get() * (delta / 10000);
+    baseX.set(baseX.get() + moveBy);
+    if (baseX.get() < -50) baseX.set(0);
+  });
+
+  return (
+    <div className="overflow-hidden whitespace-nowrap">
+      <motion.div className={cn("flex gap-8", className)} style={{ x }}>
+        {[...Array(4)].map((_, i) => (
+          <span key={i} className="flex-shrink-0">{children}</span>
+        ))}
+      </motion.div>
+    </div>
+  );
+};
+
+// --- Reveal on Scroll ---
+const RevealOnScroll = ({
+  children,
+  direction = "up",
+  delay = 0,
+  className
+}: {
+  children: React.ReactNode;
+  direction?: "up" | "down" | "left" | "right";
+  delay?: number;
+  className?: string;
+}) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+
+  const variants = {
+    hidden: {
+      opacity: 0,
+      y: direction === "up" ? 50 : direction === "down" ? -50 : 0,
+      x: direction === "left" ? 50 : direction === "right" ? -50 : 0,
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      x: 0,
+    },
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={variants}
+      transition={{ duration: 0.8, delay, ease: [0.25, 0.4, 0.25, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+// --- Magnetic Button ---
+const MagneticButton = ({
+  children,
+  className,
+  href
+}: {
+  children: React.ReactNode;
+  className?: string;
+  href?: string;
+}) => {
+  const ref = useRef<HTMLAnchorElement>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const handleMouse = (e: React.MouseEvent) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    x.set((e.clientX - centerX) * 0.2);
+    y.set((e.clientY - centerY) * 0.2);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  const springConfig = { stiffness: 150, damping: 15 };
+  const springX = useSpring(x, springConfig);
+  const springY = useSpring(y, springConfig);
+
+  return (
+    <motion.a
+      ref={ref}
+      href={href}
+      onMouseMove={handleMouse}
+      onMouseLeave={handleMouseLeave}
+      style={{ x: springX, y: springY }}
+      className={className}
+    >
+      {children}
+    </motion.a>
+  );
+};
+
+// --- Stagger Container ---
+const StaggerContainer = ({
+  children,
+  className,
+  staggerDelay = 0.1
+}: {
+  children: React.ReactNode;
+  className?: string;
+  staggerDelay?: number;
+}) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={{
+        visible: { transition: { staggerChildren: staggerDelay } },
+        hidden: {},
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const StaggerItem = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+  <motion.div
+    variants={{
+      hidden: { opacity: 0, y: 30, filter: "blur(10px)" },
+      visible: {
+        opacity: 1,
+        y: 0,
+        filter: "blur(0px)",
+        transition: { duration: 0.6, ease: [0.25, 0.4, 0.25, 1] }
+      },
+    }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+);
+
+// ============================================================================
+// ANIMATION COMPONENTS
+// ============================================================================
+
+const ScrambleText = ({ text, className, delay = 0 }: { text: string, className?: string, delay?: number }) => {
+  const [display, setDisplay] = useState("");
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    let iteration = 0;
+
+    const startScramble = () => {
+      const interval = setInterval(() => {
+        setDisplay(
+          text
+            .split("")
+            .map((char, index) => {
+              if (index < iteration) return text[index];
+              return chars[Math.floor(Math.random() * chars.length)];
+            })
+            .join("")
+        );
+
+        if (iteration >= text.length) clearInterval(interval);
+        iteration += 1 / 3;
+      }, 30);
+    };
+
+    timeout = setTimeout(startScramble, delay * 1000);
+    return () => clearTimeout(timeout);
+  }, [text, delay]);
+
+  return <span className={className}>{display}</span>;
+};
+
+// ============================================================================
+// UI COMPONENTS
+// ============================================================================
 
 const NoiseOverlay = () => (
   <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] mix-blend-overlay">
@@ -36,16 +312,28 @@ const NoiseOverlay = () => (
   </div>
 );
 
-const SectionHeader = ({ label, title }: { label: string; title: string }) => (
-  <div className="mb-12">
-    <div className={cn("flex items-center gap-4 mb-4 text-[#FF3B30] text-xs uppercase tracking-widest", spaceMono.className)}>
+const SectionHeader = ({ label, title, subtitle }: { label: string; title: string; subtitle?: string }) => (
+  <RevealOnScroll direction="up" className="mb-16 relative">
+    <div className={cn("flex items-center gap-4 mb-4 text-[#FF3B30] text-xs uppercase tracking-[0.2em]", spaceMono.className)}>
+      <span className="w-2 h-2 bg-[#FF3B30]" />
       <span>// {label}</span>
-      <span className="flex-1 h-[1px] bg-neutral-800" />
+      <motion.span
+        className="flex-1 h-[1px] bg-gradient-to-r from-[#FF3B30]/50 to-transparent origin-left"
+        initial={{ scaleX: 0 }}
+        whileInView={{ scaleX: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 1, delay: 0.3 }}
+      />
     </div>
-    <h2 className={cn("text-4xl md:text-5xl font-extrabold tracking-tight text-neutral-100", manrope.className)}>
+    <h2 className={cn("text-4xl md:text-6xl font-extrabold tracking-tight text-neutral-100 uppercase", manrope.className)}>
       {title}
     </h2>
-  </div>
+    {subtitle && (
+      <p className={cn("mt-4 text-neutral-500 max-w-xl text-sm md:text-base", spaceMono.className)}>
+        {subtitle}
+      </p>
+    )}
+  </RevealOnScroll>
 );
 
 const IndustrialButton = ({
@@ -57,426 +345,601 @@ const IndustrialButton = ({
   children: React.ReactNode;
   className?: string;
   href?: string;
-  variant?: "primary" | "ghost";
+  variant?: "primary" | "ghost" | "outline";
 }) => {
-  const baseStyles = "group relative px-6 py-3 uppercase tracking-widest text-xs font-bold transition-all duration-300 overflow-hidden flex items-center gap-2";
   const variants = {
-    primary: "bg-transparent border border-neutral-700 text-neutral-100 hover:bg-[#FF3B30] hover:border-[#FF3B30] hover:text-white",
-    ghost: "border border-transparent text-neutral-400 hover:text-white hover:bg-neutral-900"
+    primary: "bg-[#FF3B30] text-white hover:bg-[#ff5d53] shadow-[0_0_20px_-5px_#FF3B30]",
+    ghost: "bg-transparent text-neutral-400 hover:text-white hover:bg-white/5",
+    outline: "bg-transparent border border-neutral-700 text-neutral-100 hover:border-[#FF3B30] hover:text-[#FF3B30]"
   };
 
-  const Component = href ? 'a' : 'button';
-
   return (
-    <Component
+    <MagneticButton
       href={href}
-      className={cn(baseStyles, variants[variant], spaceMono.className, className)}
+      className={cn(
+        "group relative px-6 py-3 uppercase tracking-widest text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2",
+        variants[variant],
+        spaceMono.className,
+        className
+      )}
     >
-      {children}
-    </Component>
+      <span className="relative z-10 flex items-center gap-2">{children}</span>
+    </MagneticButton>
   );
 };
 
-// --- Project Card Component ---
+// --- Project Card with Scroll Effects ---
 const ProjectCard = ({ project, index }: { project: Project; index: number }) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"]
+  });
 
-  const statusColors = {
-    DEPLOYED: "text-green-500 border-green-500/30",
-    IN_PROGRESS: "text-yellow-500 border-yellow-500/30",
-    ARCHIVED: "text-neutral-500 border-neutral-500/30"
+  const y = useTransform(scrollYProgress, [0, 1], [50, -50]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0]);
+
+  const statusConfig = {
+    DEPLOYED: { color: "text-emerald-500", border: "border-emerald-500/30", bg: "bg-emerald-500/10", label: "Active" },
+    IN_PROGRESS: { color: "text-amber-500", border: "border-amber-500/30", bg: "bg-amber-500/10", label: "Building" },
+    ARCHIVED: { color: "text-neutral-500", border: "border-neutral-500/30", bg: "bg-neutral-500/10", label: "Archived" }
   };
+
+  const config = statusConfig[project.status as keyof typeof statusConfig];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="group relative border border-neutral-800 bg-[#0a0a0a] hover:border-neutral-700 transition-all duration-300"
+      ref={ref}
+      style={{ y, opacity }}
+      className="group relative h-full bg-[#0a0a0a] border border-white/10 overflow-hidden flex flex-col hover:border-[#FF3B30]/30 transition-colors duration-500"
     >
-      {/* Scan line effect on hover */}
-      <div
-        className={cn(
-          "absolute inset-0 bg-gradient-to-b from-[#FF3B30]/5 to-transparent transition-opacity duration-300",
-          isHovered ? "opacity-100" : "opacity-0"
-        )}
+      {/* Animated border glow on hover */}
+      <motion.div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        style={{
+          background: "radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 59, 48, 0.06), transparent 40%)"
+        }}
       />
 
       {/* Header */}
-      <div className="border-b border-neutral-800 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className={cn("text-xs text-neutral-600", spaceMono.className)}>{project.id}</span>
-          <span className={cn("text-sm font-bold text-[#FF3B30]", spaceMono.className)}>{project.codename}</span>
+      <div className="p-6 border-b border-white/5 flex items-start justify-between relative z-10">
+        <div>
+          <div className={cn("flex items-center gap-2 text-xs text-neutral-500 mb-2", spaceMono.className)}>
+            <span>ID: {project.id}</span>
+            <span className="text-[#FF3B30]">///</span>
+            <span>{project.classification}</span>
+          </div>
+          <h3 className={cn("text-2xl font-bold text-neutral-100 group-hover:text-[#FF3B30] transition-colors duration-300", manrope.className)}>
+            {project.title}
+          </h3>
         </div>
-        <div className={cn("text-[10px] px-2 py-1 border rounded", statusColors[project.status], spaceMono.className)}>
-          {project.status.replace("_", " ")}
+        <div className={cn("text-[10px] px-2 py-1 border rounded uppercase tracking-wider", config.color, config.border, config.bg, spaceMono.className)}>
+          {config.label}
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-6">
-        <p className={cn("text-[10px] text-neutral-500 uppercase tracking-wider mb-2", spaceMono.className)}>
-          {project.classification}
-        </p>
-        <h3 className={cn("text-xl font-bold text-neutral-100 mb-6 group-hover:text-white transition-colors", manrope.className)}>
-          {project.title}
-        </h3>
+      <div className="p-6 flex-1 relative z-10 flex flex-col gap-6">
+        <StaggerContainer className="grid grid-cols-1 gap-4" staggerDelay={0.1}>
+          <StaggerItem>
+            <div className="relative pl-4 border-l-2 border-red-500/30 group/item">
+              <motion.div
+                className="absolute left-0 top-0 w-[2px] h-0 bg-red-500 group-hover/item:h-full transition-all duration-500"
+              />
+              <h4 className={cn("text-[10px] uppercase tracking-widest text-red-500 mb-1", spaceMono.className)}>The Glitch</h4>
+              <p className="text-sm text-neutral-400 leading-relaxed">{project.glitch}</p>
+            </div>
+          </StaggerItem>
 
-        {/* System Log Style Details */}
-        <div className="space-y-4 mb-6">
-          <div className="flex gap-3">
-            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center border border-red-500/30 text-red-500">
-              <Shield size={12} />
+          <StaggerItem>
+            <div className="relative pl-4 border-l-2 border-blue-500/30 group/item">
+              <motion.div
+                className="absolute left-0 top-0 w-[2px] h-0 bg-blue-500 group-hover/item:h-full transition-all duration-500"
+              />
+              <h4 className={cn("text-[10px] uppercase tracking-widest text-blue-500 mb-1", spaceMono.className)}>The Patch</h4>
+              <p className="text-sm text-neutral-400 leading-relaxed">{project.patch}</p>
             </div>
-            <div>
-              <p className={cn("text-[10px] text-red-500 uppercase mb-1", spaceMono.className)}>The Glitch</p>
-              <p className="text-sm text-neutral-400">{project.glitch}</p>
-            </div>
-          </div>
+          </StaggerItem>
 
-          <div className="flex gap-3">
-            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center border border-blue-500/30 text-blue-500">
-              <Zap size={12} />
+          <StaggerItem>
+            <div className="relative pl-4 border-l-2 border-emerald-500/30 group/item">
+              <motion.div
+                className="absolute left-0 top-0 w-[2px] h-0 bg-emerald-500 group-hover/item:h-full transition-all duration-500"
+              />
+              <h4 className={cn("text-[10px] uppercase tracking-widest text-emerald-500 mb-1", spaceMono.className)}>Efficiency</h4>
+              <p className="text-sm text-neutral-200 font-medium">{project.efficiency}</p>
             </div>
-            <div>
-              <p className={cn("text-[10px] text-blue-500 uppercase mb-1", spaceMono.className)}>The Patch</p>
-              <p className="text-sm text-neutral-400">{project.patch}</p>
-            </div>
-          </div>
+          </StaggerItem>
+        </StaggerContainer>
 
-          <div className="flex gap-3">
-            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center border border-green-500/30 text-green-500">
-              <Activity size={12} />
-            </div>
-            <div>
-              <p className={cn("text-[10px] text-green-500 uppercase mb-1", spaceMono.className)}>System Efficiency</p>
-              <p className="text-sm text-neutral-300 font-medium">{project.efficiency}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Metrics */}
+        {/* Metrics with animated counters */}
         {project.metrics && (
-          <div className="grid grid-cols-3 gap-2 mb-6 p-3 bg-neutral-900/50 border border-neutral-800">
+          <div className="grid grid-cols-3 gap-px bg-white/5 border border-white/5 mt-auto">
             {project.metrics.map((metric, i) => (
-              <div key={i} className="text-center">
+              <div key={i} className="bg-[#0c0c0c] p-3 text-center group-hover:bg-[#111] transition-colors">
                 <p className={cn("text-lg font-bold text-[#FF3B30]", spaceMono.className)}>{metric.value}</p>
-                <p className={cn("text-[9px] text-neutral-500 uppercase", spaceMono.className)}>{metric.label}</p>
+                <p className={cn("text-[9px] text-neutral-600 uppercase tracking-tight", spaceMono.className)}>{metric.label}</p>
               </div>
             ))}
           </div>
         )}
-
-        {/* Stack */}
-        <div className="flex flex-wrap gap-2">
-          {project.stack.slice(0, 5).map((tech, i) => (
-            <span
-              key={i}
-              className={cn("text-[10px] px-2 py-1 bg-neutral-900 text-neutral-400 border border-neutral-800", spaceMono.className)}
-            >
-              {tech}
-            </span>
-          ))}
-          {project.stack.length > 5 && (
-            <span className={cn("text-[10px] px-2 py-1 text-neutral-600", spaceMono.className)}>
-              +{project.stack.length - 5}
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Footer */}
-      <div className="border-t border-neutral-800 p-4 flex justify-end gap-3">
-        {project.github && (
-          <a href={project.github} className="text-neutral-600 hover:text-white transition-colors">
-            <Github size={16} />
-          </a>
-        )}
-        {project.link && (
-          <a href={project.link} className="text-neutral-600 hover:text-[#FF3B30] transition-colors">
-            <ExternalLink size={16} />
-          </a>
-        )}
+      <div className="p-4 bg-neutral-900/30 border-t border-white/5 flex items-center justify-between z-10">
+        <div className="flex flex-wrap gap-2">
+          {project.stack.slice(0, 3).map((tech, i) => (
+            <span key={i} className={cn("text-[10px] text-neutral-500 bg-white/5 px-2 py-1 rounded-sm", spaceMono.className)}>
+              {tech}
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-4">
+          {project.github && (
+            <a href={project.github} className="text-neutral-500 hover:text-white transition-colors">
+              <Github size={18} />
+            </a>
+          )}
+          {project.link && (
+            <a href={project.link} className="text-neutral-500 hover:text-[#FF3B30] transition-colors">
+              <ExternalLink size={18} />
+            </a>
+          )}
+        </div>
       </div>
     </motion.div>
   );
 };
 
-// --- Arsenal/Stack Section ---
-const ArsenalSection = () => {
-  const categories = [
-    { key: "languages", label: "Languages", icon: ">" },
-    { key: "ml", label: "ML/AI", icon: "λ" },
-    { key: "infrastructure", label: "Infrastructure", icon: "◈" },
-    { key: "data", label: "Data", icon: "⬡" },
-    { key: "practices", label: "Practices", icon: "◉" }
-  ];
+// --- Arsenal Card ---
+const ArsenalCard = ({ category, icon: Icon, index }: { category: string; icon: React.ElementType; index: number }) => {
+  const skillList = skills[category as keyof typeof skills] || [];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      {categories.map((cat, idx) => (
+    <RevealOnScroll direction="up" delay={index * 0.1}>
+      <div className="p-6 border border-white/5 bg-[#0a0a0a] hover:border-[#FF3B30]/30 transition-all duration-500 group relative overflow-hidden h-full">
+        {/* Animated background on hover */}
         <motion.div
-          key={cat.key}
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.4, delay: idx * 0.1 }}
-          className="border border-neutral-800 bg-[#0a0a0a] p-4 hover:border-neutral-700 transition-colors"
-        >
-          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-neutral-800">
-            <span className={cn("text-[#FF3B30] text-lg", spaceMono.className)}>{cat.icon}</span>
-            <span className={cn("text-xs text-neutral-400 uppercase tracking-wider", spaceMono.className)}>
-              {cat.label}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {skills[cat.key as keyof typeof skills].map((skill, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "text-sm text-neutral-300 flex items-center gap-2 group cursor-default",
-                  spaceMono.className
-                )}
-              >
-                <ChevronRight size={10} className="text-neutral-700 group-hover:text-[#FF3B30] transition-colors" />
-                {skill}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      ))}
-    </div>
+          className="absolute inset-0 bg-gradient-to-br from-[#FF3B30]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        />
+
+        <div className="absolute top-0 right-0 p-3 opacity-30 group-hover:opacity-100 transition-opacity text-[#FF3B30]">
+          <Icon size={20} />
+        </div>
+
+        <h3 className={cn("text-sm text-neutral-400 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10", spaceMono.className)}>
+          <motion.span
+            className="w-1 h-1 bg-[#FF3B30]"
+            whileHover={{ scale: 2 }}
+          />
+          {category}
+        </h3>
+
+        <div className="flex flex-wrap gap-2 relative z-10">
+          {skillList.map((skill, i) => (
+            <motion.span
+              key={i}
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.05 }}
+              whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.1)" }}
+              className={cn(
+                "text-xs px-2 py-1 border border-white/10 text-neutral-300 bg-white/5 transition-all cursor-default",
+                spaceMono.className
+              )}
+            >
+              {skill}
+            </motion.span>
+          ))}
+        </div>
+      </div>
+    </RevealOnScroll>
   );
 };
 
-// --- Main Component ---
+// ============================================================================
+// MAIN PAGE COMPONENT
+// ============================================================================
+
 export default function Landing1() {
   useArrivalSound();
+  const [activeSection, setActiveSection] = useState("hero");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Track scroll position for parallax hero
+  const { scrollY } = useScroll();
+  const heroY = useTransform(scrollY, [0, 500], [0, 150]);
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+  const heroScale = useTransform(scrollY, [0, 400], [1, 0.95]);
+
+  // Navigation highlight based on scroll
+  useEffect(() => {
+    const sections = ["hero", "systems", "arsenal", "architect", "transmission"];
+
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 200;
+
+      for (const section of sections) {
+        const element = document.getElementById(section);
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            setActiveSection(section);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <div className={cn("min-h-screen bg-[#050505] text-[#ededed] selection:bg-[#FF3B30] selection:text-white overflow-x-hidden", manrope.className)}>
+    <div
+      ref={containerRef}
+      className={cn("min-h-screen bg-[#030303] text-[#ededed] selection:bg-[#FF3B30] selection:text-white overflow-x-hidden scroll-smooth", manrope.className)}
+    >
+      <ScrollProgressBar />
       <NoiseOverlay />
 
-      {/* --- Navigation --- */}
-      <nav className="fixed top-0 w-full z-40 border-b border-neutral-900 bg-[#050505]/80 backdrop-blur-md">
+      {/* Animated Background Grid */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:48px_48px]" />
+        <motion.div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-[#FF3B30] opacity-[0.03] blur-[150px]"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.03, 0.05, 0.03]
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
+
+      {/* --- Navigation with scroll indicator --- */}
+      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-[#030303]/80 backdrop-blur-md">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="#hero" className={cn("text-sm font-bold tracking-tighter flex items-center gap-2", spaceMono.className)}>
-            <div className="w-2 h-2 bg-[#FF3B30]" />
-            K.NARVAEZ / SYS.ENG
+          <a href="#hero" className={cn("text-sm font-bold tracking-tighter flex items-center gap-2 group", spaceMono.className)}>
+            <motion.div
+              className="w-2 h-2 bg-[#FF3B30]"
+              animate={{ opacity: [1, 0.5, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            <span className="text-white">K.NARVAEZ</span>
+            <span className="text-neutral-600">/</span>
+            <span className="text-neutral-500">SYS.ENG</span>
           </a>
-          <div className="hidden md:flex items-center gap-8 text-xs font-medium text-neutral-500 uppercase tracking-widest">
-            <a href="#systems" className="hover:text-white cursor-pointer transition-colors">Systems</a>
-            <a href="#arsenal" className="hover:text-white cursor-pointer transition-colors">Arsenal</a>
-            <a href="#architect" className="hover:text-white cursor-pointer transition-colors">Architect</a>
-            <a href="#transmission" className="hover:text-white cursor-pointer transition-colors">Contact</a>
-            <span className="text-[#FF3B30]">v2.0.0</span>
+
+          <div className="hidden md:flex items-center gap-1">
+            {[
+              { id: 'systems', label: 'Systems' },
+              { id: 'arsenal', label: 'Arsenal' },
+              { id: 'architect', label: 'Architect' },
+            ].map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                className={cn(
+                  "px-4 py-2 text-xs font-medium uppercase tracking-widest transition-all duration-300 relative",
+                  activeSection === item.id ? "text-white" : "text-neutral-500 hover:text-white"
+                )}
+              >
+                {item.label}
+                {activeSection === item.id && (
+                  <motion.div
+                    layoutId="nav-indicator"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF3B30]"
+                  />
+                )}
+              </a>
+            ))}
+            <a
+              href="#transmission"
+              className={cn("ml-4 px-4 py-2 text-xs font-bold bg-[#FF3B30] text-white uppercase tracking-widest hover:bg-[#ff5d53] transition-colors", spaceMono.className)}
+            >
+              Contact
+            </a>
           </div>
         </div>
       </nav>
 
-      <main className="pt-32 pb-20 container mx-auto px-6">
+      <main className="container mx-auto px-6 pt-32 pb-20 relative z-10">
 
-        {/* --- Hero Section --- */}
-        <section id="hero" className="mb-32 relative min-h-[70vh] flex flex-col justify-center">
-          <div className="absolute top-0 left-0 w-full h-full border-l border-r border-neutral-900 pointer-events-none opacity-50" />
+        {/* --- Hero Section with Parallax --- */}
+        <motion.section
+          id="hero"
+          className="min-h-[90vh] flex flex-col justify-center mb-20 relative"
+          style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
+        >
+          <div className="max-w-5xl">
+            {/* Boot sequence */}
+            <RevealOnScroll direction="left" delay={0.2}>
+              <div className={cn("flex items-center gap-3 mb-6 text-[#FF3B30] text-xs md:text-sm uppercase tracking-[0.25em]", spaceMono.className)}>
+                <motion.span
+                  className="w-2 h-2 bg-[#FF3B30] shadow-[0_0_10px_#FF3B30]"
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+                <ScrambleText text="System Online" delay={0.5} />
+                <span className="w-8 h-[1px] bg-[#FF3B30]/50" />
+                <span className="text-neutral-500">v2.0.26</span>
+              </div>
+            </RevealOnScroll>
 
+            {/* Main Headline with stagger */}
+            <StaggerContainer className="mb-8" staggerDelay={0.15}>
+              <h1 className="text-5xl md:text-8xl lg:text-9xl font-extrabold tracking-tighter leading-[0.9] text-neutral-100 uppercase">
+                <StaggerItem>
+                  <span className="block">Building</span>
+                </StaggerItem>
+                <StaggerItem>
+                  <span className="block text-neutral-600">The Digital</span>
+                </StaggerItem>
+                <StaggerItem>
+                  <span className="block">Cortex.</span>
+                </StaggerItem>
+              </h1>
+            </StaggerContainer>
+
+            {/* Subtext and CTA */}
+            <RevealOnScroll direction="up" delay={0.8}>
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 border-l-2 border-[#FF3B30]/20 pl-6 md:border-none md:pl-0">
+                <p className="max-w-xl text-lg md:text-xl text-neutral-400 leading-relaxed font-light">
+                  <span className="text-white font-medium">{profile.role}</span> specializing in bridging high-dimensional AI models with scalable, production-grade infrastructure.
+                </p>
+                <div className="flex items-center gap-4">
+                  <span className={cn("text-xs text-neutral-600 uppercase tracking-widest text-right hidden md:block", spaceMono.className)}>
+                    Available for<br/>Deployment
+                  </span>
+                  <div className="w-px h-8 bg-neutral-800 hidden md:block" />
+                  <IndustrialButton href="#systems">
+                    Explore Systems <ArrowUpRight size={16} />
+                  </IndustrialButton>
+                </div>
+              </div>
+            </RevealOnScroll>
+          </div>
+
+          {/* Scroll indicator */}
           <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 2 }}
           >
-            <div className={cn("flex flex-col md:flex-row items-baseline gap-4 mb-4 text-[#FF3B30] text-sm uppercase tracking-widest", spaceMono.className)}>
-              <span>// Neural Architect</span>
-              <span className="w-12 h-[1px] bg-[#FF3B30]" />
-              <span>System Status: Online</span>
-            </div>
-
-            <h1 className="text-6xl md:text-9xl font-extrabold tracking-tighter leading-[0.9] mb-8 text-neutral-100">
-              BUILDING <br />
-              <span className="text-neutral-600">THE DIGITAL</span> <br />
-              CORTEX.
-            </h1>
-
-            <p className="max-w-xl text-lg md:text-xl text-neutral-400 leading-relaxed mb-12">
-              {profile.role} specializing in bridging high-dimensional models with scalable, production-grade infrastructure.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <IndustrialButton href="#systems">
-                View Systems <ArrowUpRight size={16} />
-              </IndustrialButton>
-              <IndustrialButton href="#transmission" variant="ghost">
-                Open Channel
-              </IndustrialButton>
-            </div>
+            <span className={cn("text-[10px] text-neutral-600 uppercase tracking-[0.3em]", spaceMono.className)}>
+              Scroll to explore
+            </span>
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              <ArrowDown size={16} className="text-[#FF3B30]" />
+            </motion.div>
           </motion.div>
-        </section>
 
-        {/* --- Selected Systems (Projects) --- */}
-        <section id="systems" className="mb-32 scroll-mt-24">
-          <SectionHeader label="Selected Systems" title="Mission Files" />
+          {/* Parallax floating text */}
+          <div className="absolute bottom-0 left-0 right-0 overflow-hidden opacity-[0.03] pointer-events-none">
+            <ParallaxText baseVelocity={-2} className={cn("text-[150px] font-black uppercase tracking-tighter text-white", manrope.className)}>
+              Neural Architect • System Engineer • AI Builder •
+            </ParallaxText>
+          </div>
+        </motion.section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {projects.map((project, index) => (
-              <ProjectCard key={project.id} project={project} index={index} />
+        {/* --- Systems Grid --- */}
+        <section id="systems" className="scroll-mt-32 mb-40">
+          <SectionHeader
+            label="Selected Works"
+            title="Mission Files"
+            subtitle="A collection of deployed systems and architectural experiments."
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {projects.map((project, idx) => (
+              <ProjectCard key={project.id} project={project} index={idx} />
             ))}
           </div>
         </section>
 
-        {/* --- Arsenal (Tech Stack) --- */}
-        <section id="arsenal" className="mb-32 scroll-mt-24">
-          <SectionHeader label="Technical Arsenal" title="System Components" />
-          <ArsenalSection />
-        </section>
+        {/* --- Arsenal Section --- */}
+        <section id="arsenal" className="scroll-mt-32 mb-40">
+          <SectionHeader
+            label="Technical Stack"
+            title="Arsenal"
+            subtitle="Core technologies for building robust digital infrastructures."
+          />
 
-        {/* --- The Architect (About) --- */}
-        <section id="architect" className="mb-32 scroll-mt-24">
-          <SectionHeader label="The Architect" title="Behind The Systems" />
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="lg:col-span-2 border border-neutral-800 bg-[#0a0a0a] p-8"
-            >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-neutral-900 border border-neutral-800 flex items-center justify-center">
-                  <span className={cn("text-2xl text-[#FF3B30]", spaceMono.className)}>KN</span>
-                </div>
-                <div>
-                  <h3 className={cn("text-xl font-bold text-neutral-100", manrope.className)}>{profile.name}</h3>
-                  <p className={cn("text-sm text-neutral-500", spaceMono.className)}>{profile.role}</p>
-                </div>
-              </div>
-
-              <p className="text-neutral-400 leading-relaxed mb-6">
-                {profile.bio}
-              </p>
-
-              <div className="flex items-center gap-6 text-sm text-neutral-500">
-                <span className={cn("flex items-center gap-2", spaceMono.className)}>
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  Available for projects
-                </span>
-                <span className={spaceMono.className}>{profile.location}</span>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="border border-neutral-800 bg-[#0a0a0a] p-6"
-            >
-              <div className={cn("text-xs text-neutral-500 uppercase tracking-wider mb-4 pb-2 border-b border-neutral-800", spaceMono.className)}>
-                Quick Stats
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <p className={cn("text-3xl font-bold text-[#FF3B30]", spaceMono.className)}>{profile.years}+</p>
-                  <p className={cn("text-xs text-neutral-500", spaceMono.className)}>Years Experience</p>
-                </div>
-                <div>
-                  <p className={cn("text-3xl font-bold text-neutral-100", spaceMono.className)}>{projects.filter(p => p.status === "DEPLOYED").length}</p>
-                  <p className={cn("text-xs text-neutral-500", spaceMono.className)}>Systems Deployed</p>
-                </div>
-                <div>
-                  <p className={cn("text-3xl font-bold text-neutral-100", spaceMono.className)}>99.9%</p>
-                  <p className={cn("text-xs text-neutral-500", spaceMono.className)}>Uptime Record</p>
-                </div>
-              </div>
-            </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { category: "languages", icon: Code2 },
+              { category: "ml", icon: Cpu },
+              { category: "infrastructure", icon: Server },
+              { category: "data", icon: Database },
+              { category: "practices", icon: Globe },
+            ].map((item, idx) => (
+              <ArsenalCard key={item.category} category={item.category} icon={item.icon} index={idx} />
+            ))}
           </div>
         </section>
 
-        {/* --- Transmission (Contact) --- */}
-        <section id="transmission" className="scroll-mt-24">
-          <SectionHeader label="Open Channel" title="Transmission" />
+        {/* --- Architect Section with Parallax Image --- */}
+        <section id="architect" className="scroll-mt-32 mb-40">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="lg:col-span-5">
+              <SectionHeader label="The Architect" title="Kevin Narvaez" />
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="border border-neutral-800 bg-[#0a0a0a] overflow-hidden"
-          >
-            {/* Terminal Header */}
-            <div className="border-b border-neutral-800 px-4 py-2 flex items-center justify-between bg-neutral-900/50">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                <div className="w-3 h-3 rounded-full bg-green-500/80" />
-              </div>
-              <span className={cn("text-xs text-neutral-600", spaceMono.className)}>transmission_protocol.sh</span>
-              <Terminal size={14} className="text-neutral-600" />
+              <RevealOnScroll direction="left">
+                <div className="relative aspect-square bg-neutral-900 border border-white/10 overflow-hidden group">
+                  <motion.div
+                    className="absolute inset-0 bg-[#FF3B30] mix-blend-color opacity-0 group-hover:opacity-20 transition-opacity duration-500"
+                  />
+                  <div className="w-full h-full flex items-center justify-center bg-[#0a0a0a]">
+                    <motion.span
+                      className={cn("text-8xl text-neutral-800 font-bold", manrope.className)}
+                      whileHover={{ scale: 1.1, color: "#FF3B30" }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      KN
+                    </motion.span>
+                  </div>
+                </div>
+              </RevealOnScroll>
             </div>
 
-            {/* Terminal Content */}
-            <div className={cn("p-6 text-sm", spaceMono.className)}>
-              <div className="space-y-2 text-neutral-500 mb-6">
-                <p><span className="text-green-500">$</span> establishing_connection...</p>
-                <p><span className="text-green-500">$</span> encryption: <span className="text-neutral-300">enabled</span></p>
-                <p><span className="text-green-500">$</span> channel_status: <span className="text-green-400">OPEN</span></p>
-                <p><span className="text-green-500">$</span> awaiting_transmission_</p>
-              </div>
+            <div className="lg:col-span-7 flex flex-col justify-center">
+              <RevealOnScroll direction="right">
+                <h3 className={cn("text-2xl text-white mb-6 font-bold", manrope.className)}>
+                  Engineering the bridge between <span className="text-[#FF3B30]">Abstract Logic</span> and <span className="text-[#FF3B30]">Concrete Reality</span>.
+                </h3>
+              </RevealOnScroll>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <a
-                  href={`mailto:${profile.email}`}
-                  className="flex items-center gap-3 p-4 border border-neutral-800 hover:border-[#FF3B30] hover:bg-[#FF3B30]/5 transition-all group"
-                >
-                  <Mail size={20} className="text-neutral-600 group-hover:text-[#FF3B30]" />
-                  <div>
-                    <p className="text-xs text-neutral-500">Email</p>
-                    <p className="text-neutral-300 group-hover:text-white">{profile.email}</p>
-                  </div>
-                </a>
+              <RevealOnScroll direction="up" delay={0.2}>
+                <div className="space-y-6 text-neutral-400 leading-relaxed text-lg font-light">
+                  <p>{profile.bio}</p>
+                  <p>My philosophy: Code is not just syntax; it is the blueprint for digital machinery.</p>
+                </div>
+              </RevealOnScroll>
 
-                <a
-                  href={profile.github}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-4 border border-neutral-800 hover:border-[#FF3B30] hover:bg-[#FF3B30]/5 transition-all group"
-                >
-                  <Github size={20} className="text-neutral-600 group-hover:text-[#FF3B30]" />
+              {/* Animated Stats */}
+              <RevealOnScroll direction="up" delay={0.4}>
+                <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-white/10 pt-8">
                   <div>
-                    <p className="text-xs text-neutral-500">GitHub</p>
-                    <p className="text-neutral-300 group-hover:text-white">@knarvaez</p>
+                    <h4 className={cn("text-3xl font-bold text-white", spaceMono.className)}>
+                      <AnimatedCounter value={profile.years} suffix="+" />
+                    </h4>
+                    <span className="text-xs text-neutral-500 uppercase tracking-widest">Years</span>
                   </div>
-                </a>
+                  <div>
+                    <h4 className={cn("text-3xl font-bold text-white", spaceMono.className)}>
+                      <AnimatedCounter value={projects.length} />
+                    </h4>
+                    <span className="text-xs text-neutral-500 uppercase tracking-widest">Projects</span>
+                  </div>
+                  <div>
+                    <h4 className={cn("text-3xl font-bold text-white", spaceMono.className)}>
+                      <AnimatedCounter value={99} suffix="%" />
+                    </h4>
+                    <span className="text-xs text-neutral-500 uppercase tracking-widest">Uptime</span>
+                  </div>
+                  <div>
+                    <motion.div
+                      className="flex items-center gap-2"
+                      animate={{ opacity: [1, 0.5, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+                      <span className="text-xs text-emerald-500 uppercase tracking-widest">Available</span>
+                    </motion.div>
+                  </div>
+                </div>
+              </RevealOnScroll>
+            </div>
+          </div>
+        </section>
 
-                <a
-                  href={profile.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-4 border border-neutral-800 hover:border-[#FF3B30] hover:bg-[#FF3B30]/5 transition-all group"
-                >
-                  <Linkedin size={20} className="text-neutral-600 group-hover:text-[#FF3B30]" />
-                  <div>
-                    <p className="text-xs text-neutral-500">LinkedIn</p>
-                    <p className="text-neutral-300 group-hover:text-white">/in/knarvaez</p>
+        {/* --- Contact Section --- */}
+        <section id="transmission" className="scroll-mt-32 mb-20">
+          <RevealOnScroll direction="up">
+            <div className="border border-white/10 bg-[#050505] relative overflow-hidden">
+              <motion.div
+                className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FF3B30] via-[#FF3B30]/50 to-transparent"
+                initial={{ scaleX: 0, originX: 0 }}
+                whileInView={{ scaleX: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1, delay: 0.3 }}
+              />
+
+              <div className="grid grid-cols-1 lg:grid-cols-2">
+                <div className="p-10 border-b lg:border-b-0 lg:border-r border-white/10">
+                  <div className={cn("flex items-center gap-3 mb-6 text-[#FF3B30]", spaceMono.className)}>
+                    <Terminal size={20} />
+                    <span className="text-sm uppercase tracking-widest">Secure_Channel</span>
                   </div>
-                </a>
+                  <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 uppercase tracking-tight">
+                    Ready to <br/> collaborate?
+                  </h2>
+                  <p className="text-neutral-400 mb-8 max-w-md">
+                    Initialize a transmission to discuss system architecture, full-stack development, or AI integration.
+                  </p>
+
+                  <StaggerContainer className="flex flex-col gap-4" staggerDelay={0.1}>
+                    <StaggerItem>
+                      <a href={`mailto:${profile.email}`} className="flex items-center justify-between p-4 border border-white/10 hover:border-[#FF3B30] hover:bg-white/5 transition-all group">
+                        <span className={cn("text-sm text-neutral-300", spaceMono.className)}>EMAIL</span>
+                        <span className="text-neutral-500 group-hover:text-white transition-colors">{profile.email}</span>
+                      </a>
+                    </StaggerItem>
+                    <StaggerItem>
+                      <a href={profile.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 border border-white/10 hover:border-[#FF3B30] hover:bg-white/5 transition-all group">
+                        <span className={cn("text-sm text-neutral-300", spaceMono.className)}>LINKEDIN</span>
+                        <Linkedin size={16} className="text-neutral-500 group-hover:text-white" />
+                      </a>
+                    </StaggerItem>
+                    <StaggerItem>
+                      <a href={profile.github} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 border border-white/10 hover:border-[#FF3B30] hover:bg-white/5 transition-all group">
+                        <span className={cn("text-sm text-neutral-300", spaceMono.className)}>GITHUB</span>
+                        <Github size={16} className="text-neutral-500 group-hover:text-white" />
+                      </a>
+                    </StaggerItem>
+                  </StaggerContainer>
+                </div>
+
+                <div className="p-10 flex flex-col justify-between bg-neutral-900/20">
+                  <div className={cn("font-mono text-xs text-green-500/80 space-y-2", spaceMono.className)}>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      {`> establishing_connection... [OK]`}
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      {`> encryption: AES-256`}
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      {`> channel_status: OPEN`}
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 0.7 }}
+                    >
+                      {`> await_input: `}<span className="animate-pulse">_</span>
+                    </motion.p>
+                  </div>
+                </div>
               </div>
             </div>
-          </motion.div>
+          </RevealOnScroll>
         </section>
 
         {/* --- Footer --- */}
-        <footer className="mt-32 border-t border-neutral-900 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-neutral-600">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <span className={spaceMono.className}>© 2026 {profile.name}</span>
-            <span className="hidden md:inline">•</span>
-            <span className="text-xs">{profile.location}</span>
+        <footer className="border-t border-white/10 py-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-neutral-600">
+          <div className={cn("flex gap-6 uppercase tracking-widest", spaceMono.className)}>
+            <span>© 2026 Kevin Narvaez</span>
+            <span>All Rights Reserved</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className={cn("text-xs", spaceMono.className)}>All systems operational</span>
-          </div>
+          <motion.div
+            className="flex items-center gap-2"
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          >
+            <div className="w-2 h-2 bg-green-500 rounded-full" />
+            <span>All Systems Operational</span>
+          </motion.div>
         </footer>
 
       </main>
