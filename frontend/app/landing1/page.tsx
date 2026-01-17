@@ -644,6 +644,36 @@ const ArsenalCard = ({ category, icon: Icon, index }: { category: string; icon: 
   );
 };
 
+// --- Section with Highlight Effect ---
+const SectionWithHighlight = ({
+  id,
+  isHighlighted,
+  children,
+  className
+}: {
+  id: string;
+  isHighlighted: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <section id={id} className={cn("relative", className)}>
+    {/* Highlight flash effect */}
+    <motion.div
+      className="absolute inset-0 pointer-events-none z-0"
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: isHighlighted ? [0, 0.15, 0] : 0,
+        scale: isHighlighted ? [1, 1.02, 1] : 1
+      }}
+      transition={{ duration: 1.2, ease: "easeOut" }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-b from-[#FF3B30]/20 via-transparent to-transparent rounded-lg" />
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF3B30] to-transparent" />
+    </motion.div>
+    {children}
+  </section>
+);
+
 // ============================================================================
 // MAIN PAGE COMPONENT
 // ============================================================================
@@ -651,7 +681,45 @@ const ArsenalCard = ({ category, icon: Icon, index }: { category: string; icon: 
 export default function Landing1() {
   useArrivalSound();
   const [activeSection, setActiveSection] = useState("hero");
+  const [highlightedSection, setHighlightedSection] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Smooth scroll with highlight effect
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    e.preventDefault();
+    const element = document.getElementById(sectionId);
+    if (element) {
+      // Trigger highlight effect
+      setHighlightedSection(sectionId);
+      setTimeout(() => setHighlightedSection(null), 1500);
+
+      // Smooth scroll with custom easing
+      const targetPosition = element.offsetTop - 80;
+      const startPosition = window.scrollY;
+      const distance = targetPosition - startPosition;
+      const duration = 1000;
+      let start: number | null = null;
+
+      const easeInOutCubic = (t: number) => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+
+      const animation = (currentTime: number) => {
+        if (start === null) start = currentTime;
+        const timeElapsed = currentTime - start;
+        const progress = Math.min(timeElapsed / duration, 1);
+        const ease = easeInOutCubic(progress);
+
+        window.scrollTo(0, startPosition + distance * ease);
+
+        if (timeElapsed < duration) {
+          requestAnimationFrame(animation);
+        }
+      };
+
+      requestAnimationFrame(animation);
+    }
+  };
 
   // Track scroll position for parallax hero
   const { scrollY } = useScroll();
@@ -714,6 +782,7 @@ export default function Landing1() {
               <a
                 key={item.id}
                 href={`#${item.id}`}
+                onClick={(e) => scrollToSection(e, item.id)}
                 className={cn(
                   "px-4 py-2 text-xs font-medium uppercase tracking-widest transition-all duration-300 relative",
                   activeSection === item.id ? "text-white" : "text-neutral-500 hover:text-white"
@@ -730,6 +799,7 @@ export default function Landing1() {
             ))}
             <a
               href="#transmission"
+              onClick={(e) => scrollToSection(e, 'transmission')}
               className={cn("ml-4 px-4 py-2 text-xs font-bold bg-[#FF3B30] text-white uppercase tracking-widest hover:bg-[#ff5d53] transition-colors", spaceMono.className)}
             >
               Contact
@@ -838,7 +908,7 @@ export default function Landing1() {
         </motion.section>
 
         {/* --- Systems Grid --- */}
-        <section id="systems" className="scroll-mt-32 mb-40">
+        <SectionWithHighlight id="systems" isHighlighted={highlightedSection === 'systems'} className="scroll-mt-32 mb-40">
           <SectionHeader
             label="Selected Works"
             title="Mission Files"
@@ -850,10 +920,10 @@ export default function Landing1() {
               <ProjectCard key={project.id} project={project} index={idx} />
             ))}
           </div>
-        </section>
+        </SectionWithHighlight>
 
         {/* --- Arsenal Section --- */}
-        <section id="arsenal" className="scroll-mt-32 mb-40">
+        <SectionWithHighlight id="arsenal" isHighlighted={highlightedSection === 'arsenal'} className="scroll-mt-32 mb-40">
           <SectionHeader
             label="Technical Stack"
             title="Arsenal"
@@ -871,10 +941,10 @@ export default function Landing1() {
               <ArsenalCard key={item.category} category={item.category} icon={item.icon} index={idx} />
             ))}
           </div>
-        </section>
+        </SectionWithHighlight>
 
         {/* --- Architect Section with Parallax Image --- */}
-        <section id="architect" className="scroll-mt-32 mb-40">
+        <SectionWithHighlight id="architect" isHighlighted={highlightedSection === 'architect'} className="scroll-mt-32 mb-40">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             <div className="lg:col-span-5">
               <SectionHeader label="The Architect" title="Kevin Narvaez" />
@@ -946,10 +1016,10 @@ export default function Landing1() {
               </RevealOnScroll>
             </div>
           </div>
-        </section>
+        </SectionWithHighlight>
 
         {/* --- Contact Section --- */}
-        <section id="transmission" className="scroll-mt-32 mb-20">
+        <SectionWithHighlight id="transmission" isHighlighted={highlightedSection === 'transmission'} className="scroll-mt-32 mb-20">
           <RevealOnScroll direction="up">
             <div className="border border-white/10 bg-[#050505] relative overflow-hidden">
               <motion.div
@@ -1034,7 +1104,7 @@ export default function Landing1() {
               </div>
             </div>
           </RevealOnScroll>
-        </section>
+        </SectionWithHighlight>
 
         {/* --- Footer --- */}
         <footer className="border-t border-white/10 py-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-neutral-600">
