@@ -738,12 +738,12 @@ export default function Landing1() {
         </div>
       </nav>
 
-      <main className="container mx-auto px-6 pt-32 pb-20 relative z-10">
+      <main className="container mx-auto px-6 pt-24 pb-20 relative z-10">
 
         {/* --- Hero Section with Parallax + Glitch --- */}
         <motion.section
           id="hero"
-          className="min-h-[80vh] flex flex-col justify-center mb-20 relative pt-8"
+          className="min-h-[75vh] flex flex-col justify-start mb-20 relative pt-4"
           style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
         >
           <div className="max-w-5xl">
