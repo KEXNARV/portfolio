@@ -371,10 +371,24 @@ export const IndustrialReactor = ({ theme, onEnter }: { theme: any, onEnter: () 
   const { initAudio, startDrone, stopDrone, startCharge, stopCharge, playWarpSound, playBleep } = useIndustrialSound();
   const mouseRef = useRef({ x: -1000, y: -1000 });
 
+  // Touch Support for Mouse Position
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => { mouseRef.current = { x: e.clientX, y: e.clientY }; initAudio(); };
+    const handleMove = (x: number, y: number) => {
+        mouseRef.current = { x, y };
+        initAudio();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+    const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches[0]) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchmove', handleTouchMove);
+    return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('touchmove', handleTouchMove);
+    };
   }, [initAudio]);
 
   useEffect(() => {
@@ -812,6 +826,21 @@ export const IndustrialReactor = ({ theme, onEnter }: { theme: any, onEnter: () 
       }
   }, [chargeLevel, isWarping, playWarpSound, onEnter]);
 
+  // Handlers unificados para Mouse y Touch
+  const startInteraction = () => {
+    setIsHolding(true);
+    startDrone();
+    startCharge();
+  };
+
+  const endInteraction = () => {
+    if (!isWarping) {
+      setIsHolding(false);
+      stopCharge();
+      stopDrone();
+    }
+  };
+
   const handleMouseEnter = () => {
       setIsHovering(true);
       playBleep(); 
@@ -823,24 +852,54 @@ export const IndustrialReactor = ({ theme, onEnter }: { theme: any, onEnter: () 
       <div className="absolute inset-0" style={{ transform: isHolding && !isWarping ? `translate(${(Math.random()-0.5)*4}px, ${(Math.random()-0.5)*4}px)` : "none", filter: isHolding && !isWarping ? `blur(${chargeLevel * 0.02}px)` : "none" }}>
          <canvas ref={canvasRef} className="absolute inset-0 z-0" />
       </div>
-      <div className={cn("absolute inset-0 z-30 pointer-events-none p-8 md:p-16 flex flex-col justify-between transition-opacity duration-500", isWarping ? "opacity-0" : "opacity-100")}>
+      <div className={cn("absolute inset-0 z-30 pointer-events-none p-6 md:p-16 flex flex-col justify-between transition-opacity duration-500", isWarping ? "opacity-0" : "opacity-100")}>
         <div className="flex justify-between items-start">
-            <div><div className="text-[10px] text-[#FF3B30] font-mono tracking-[0.2em] mb-1">SYSTEM_ID</div><h1 className={cn("text-4xl md:text-6xl font-bold tracking-tighter leading-none mix-blend-difference", manrope.className)}>INDUSTRIAL <br/> CORE</h1></div>
+            <div>
+              <div className="text-[10px] text-[#FF3B30] font-mono tracking-[0.2em] mb-1">SYSTEM_ID</div>
+              <h1 className={cn("text-3xl md:text-6xl font-bold tracking-tighter leading-none mix-blend-difference", manrope.className)}>INDUSTRIAL <br/> CORE</h1>
+            </div>
             <div className="text-right hidden md:block"><div className="text-[10px] text-[#FF3B30] font-mono tracking-[0.2em] mb-1">STATUS</div><div className={cn("text-xl font-mono", spaceMono.className)}>{isHolding ? "CRITICAL" : "ONLINE"}</div><div className="flex gap-4 justify-end mt-2 font-mono text-xs opacity-60"><div>MEM: {memory}</div><div>LAT: {Math.floor(latency)}ms</div></div></div>
         </div>
+        
+        {/* Central Button Layer */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto">
-            <button ref={buttonRef} onMouseEnter={handleMouseEnter} onMouseLeave={() => { setIsHovering(false); setIsHolding(false); stopCharge(); stopDrone(); }} onMouseDown={() => { setIsHolding(true); startDrone(); startCharge(); }} onMouseUp={() => { if (!isWarping) { setIsHolding(false); stopCharge(); stopDrone(); } }}
-                className={cn("relative group w-64 h-64 rounded-full flex items-center justify-center transition-all duration-100", isHolding ? "scale-95" : "hover:scale-105")}>
+            <button 
+                ref={buttonRef} 
+                onMouseEnter={handleMouseEnter} 
+                onMouseLeave={() => { setIsHovering(false); endInteraction(); }} 
+                onMouseDown={startInteraction} 
+                onMouseUp={endInteraction}
+                onTouchStart={(e) => { e.preventDefault(); startInteraction(); }}
+                onTouchEnd={(e) => { e.preventDefault(); endInteraction(); }}
+                className={cn("relative group w-48 h-48 md:w-64 md:h-64 rounded-full flex items-center justify-center transition-all duration-100 outline-none select-none touch-none", isHolding ? "scale-95" : "hover:scale-105")}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
                 <div className={cn("absolute inset-0 rounded-full border border-[#333] bg-black/40 backdrop-blur-sm transition-all duration-300", isHolding ? "border-[#FF3B30] border-4 shadow-[0_0_50px_rgba(255,59,48,0.5)]" : "group-hover:border-white/30")} />
-                <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none"><circle cx="128" cy="128" r="120" fill="none" stroke="#FF3B30" strokeWidth="4" strokeDasharray="754" strokeDashoffset={754 - (754 * chargeLevel) / 100} className="transition-all duration-75 ease-linear" /></svg>
+                <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none"><circle cx="50%" cy="50%" r="46%" fill="none" stroke="#FF3B30" strokeWidth="4" strokeDasharray="754" strokeDashoffset={754 - (754 * chargeLevel) / 100} className="transition-all duration-75 ease-linear" /></svg>
                 <div className={cn("absolute inset-0 rounded-full border-2 border-dashed border-[#FF3B30]/30 animate-spin-slow transition-opacity", isHolding ? "opacity-100 duration-100 animate-spin-fast" : "opacity-0")} />
                 <div className="text-center z-10"><span className={cn("block text-xs font-bold tracking-[0.2em] uppercase transition-colors", isHolding ? "text-[#FF3B30]" : "text-white group-hover:text-[#FF3B30]")}>{isHolding ? (chargeLevel >= 100 ? "INITIATED" : `${chargeLevel}%`) : "HOLD TO INIT"}</span>{isHolding && chargeLevel < 100 && <span className="block text-[10px] text-[#FF3B30] mt-1 animate-pulse">CHARGING</span>}</div>
             </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 border-t border-[#333] pt-8 bg-black/20 backdrop-blur-sm pointer-events-auto">
-             <div className="group hover:bg-[#FF3B30]/10 p-2 transition-colors rounded"><div className="flex justify-between items-center mb-2"><div className="flex items-center gap-2 text-[#FF3B30] text-[10px] font-bold tracking-widest"><Cpu size={14}/> LOAD</div><span className={cn("text-xs font-mono", spaceMono.className)}>{Math.floor(cpu)}%</span></div><div className="w-full h-1 bg-[#333] overflow-hidden"><div className="h-full bg-[#FF3B30] transition-all duration-500" style={{ width: `${cpu}%` }} /></div></div>
-             <div className="group hover:bg-[#FF3B30]/10 p-2 transition-colors rounded"><div className="flex justify-between items-center mb-2"><div className="flex items-center gap-2 text-[#FF3B30] text-[10px] font-bold tracking-widest"><Activity size={14}/> NETWORK</div></div><Sparkline data={history} color="#FF3B30" /></div>
-             <div className="group hover:bg-[#FF3B30]/10 p-2 transition-colors rounded"><div className="flex items-center gap-2 text-[#FF3B30] text-[10px] font-bold tracking-widest"><Fingerprint size={14}/> IDENTITY</div><p className={cn("text-xs opacity-70 leading-relaxed", spaceMono.className)}>Robust engineering meets minimalist aesthetics.</p></div>
+
+        {/* Bottom Grid Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 border-t border-[#333] pt-6 md:pt-8 bg-black/20 backdrop-blur-sm pointer-events-auto">
+             <div className="group hover:bg-[#FF3B30]/10 p-2 transition-colors rounded">
+               <div className="flex justify-between items-center mb-2">
+                 <div className="flex items-center gap-2 text-[#FF3B30] text-[10px] font-bold tracking-widest"><Cpu size={14}/> LOAD</div>
+                 <span className={cn("text-xs font-mono", spaceMono.className)}>{Math.floor(cpu)}%</span>
+               </div>
+               <div className="w-full h-1 bg-[#333] overflow-hidden"><div className="h-full bg-[#FF3B30] transition-all duration-500" style={{ width: `${cpu}%` }} /></div>
+             </div>
+             
+             {/* Hide Sparkline on Mobile to save space */}
+             <div className="hidden md:block group hover:bg-[#FF3B30]/10 p-2 transition-colors rounded">
+               <div className="flex justify-between items-center mb-2"><div className="flex items-center gap-2 text-[#FF3B30] text-[10px] font-bold tracking-widest"><Activity size={14}/> NETWORK</div></div><Sparkline data={history} color="#FF3B30" />
+             </div>
+             
+             <div className="group hover:bg-[#FF3B30]/10 p-2 transition-colors rounded flex flex-col justify-center">
+               <div className="flex items-center gap-2 text-[#FF3B30] text-[10px] font-bold tracking-widest mb-1"><Fingerprint size={14}/> IDENTITY</div>
+               <p className={cn("text-[10px] md:text-xs opacity-70 leading-relaxed", spaceMono.className)}>Robust engineering meets minimalist aesthetics.</p>
+             </div>
         </div>
       </div>
     </div>
