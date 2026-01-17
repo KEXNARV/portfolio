@@ -601,18 +601,18 @@ export default function ThemeSelector({ params }: { params: Promise<{ id: string
         {viewState === 'carousel' && (
             <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 1.5, filter: "blur(10px)" }} transition={{ duration: 0.8 }}
-                className="relative w-full max-w-5xl h-[500px] flex items-center justify-center perspective-[1000px]"
+                className="relative w-full flex flex-col items-center justify-center flex-1 min-h-0"
             >
-                {/* Navigation Buttons */}
-                <button onClick={prevTheme} className="absolute left-4 md:left-10 z-20 p-4 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 transition-all hover:scale-110 cursor-pointer">
+                {/* Desktop Navigation Buttons (Hidden on Mobile) */}
+                <button onClick={prevTheme} className="hidden md:flex absolute left-10 z-20 p-4 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 transition-all hover:scale-110 cursor-pointer">
                     <ArrowLeft size={24} />
                 </button>
-                <button onClick={nextTheme} className="absolute right-4 md:right-10 z-20 p-4 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 transition-all hover:scale-110 cursor-pointer">
+                <button onClick={nextTheme} className="hidden md:flex absolute right-10 z-20 p-4 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 transition-all hover:scale-110 cursor-pointer">
                     <ArrowRight size={24} />
                 </button>
 
-                {/* Cards */}
-                <div className="relative w-[300px] md:w-[400px] h-[500px] flex items-center justify-center">
+                {/* Responsive Card Container */}
+                <div className="relative w-[85vw] max-w-[340px] md:max-w-[400px] aspect-[3/4] md:h-[500px] md:aspect-auto flex items-center justify-center perspective-[1000px]">
                     <AnimatePresence mode="popLayout" initial={false} custom={direction}>
                         <motion.div
                             key={currentIndex}
@@ -622,24 +622,37 @@ export default function ThemeSelector({ params }: { params: Promise<{ id: string
                             animate="center"
                             exit="exit"
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={cn("absolute inset-0 rounded-3xl overflow-hidden shadow-2xl cursor-pointer ring-1 ring-white/10", currentTheme.style)}
+                            className={cn("absolute inset-0 rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl cursor-pointer ring-1 ring-white/10 touch-pan-y", currentTheme.style)}
                             onClick={handleEnter}
+                            drag="x"
+                            dragConstraints={{ left: 0, right: 0 }}
+                            dragElastic={0.2}
+                            onDragEnd={(e, { offset, velocity }) => {
+                                const swipe = offset.x;
+                                if (swipe < -50) nextTheme();
+                                else if (swipe > 50) prevTheme();
+                            }}
                         >
-                            <div className={cn("w-full h-full", currentTheme.fontMain)}>{currentTheme.previewContent}</div>
+                            <div className={cn("w-full h-full pointer-events-none", currentTheme.fontMain)}>{currentTheme.previewContent}</div>
                             {/* LOCKED OVERLAY */}
                             {currentTheme.locked && (
-                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm z-20">
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm z-20 pointer-events-none">
                                     <div className="border border-white/20 bg-black/80 px-4 py-2 text-xs uppercase tracking-widest text-white/50 flex items-center gap-2">
                                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" /> Locked
                                     </div>
                                 </div>
                             )}
-                            <div className="absolute bottom-0 w-full p-6 bg-gradient-to-t from-black/80 to-transparent pt-20">
+                            <div className="absolute bottom-0 w-full p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-20 pointer-events-none">
                                 <h3 className={cn("text-2xl font-bold mb-1 text-white", currentTheme.fontMain)}>{currentTheme.name}</h3>
                                 <p className="text-xs text-gray-300 opacity-80">{currentTheme.description}</p>
                             </div>
                         </motion.div>
                     </AnimatePresence>
+                </div>
+                
+                {/* Mobile Navigation Hint (Swipe) */}
+                <div className="md:hidden mt-4 text-[10px] text-white/30 uppercase tracking-widest animate-pulse">
+                    &lt; Swipe to Navigate &gt;
                 </div>
             </motion.div>
         )}
