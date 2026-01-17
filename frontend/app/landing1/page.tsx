@@ -806,14 +806,14 @@ export default function Landing1() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 2.5, duration: 1 }}
-            className="absolute bottom-8 left-0 right-0 z-20"
+            className="absolute -bottom-4 left-0 right-0 z-20"
           >
             <DataTicker />
           </motion.div>
 
           {/* Scroll indicator */}
           <motion.div
-            className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 3 }}
@@ -830,7 +830,7 @@ export default function Landing1() {
           </motion.div>
 
           {/* Parallax floating text */}
-          <div className="absolute -bottom-12 left-0 right-0 overflow-hidden opacity-[0.03] pointer-events-none">
+          <div className="absolute -bottom-24 left-0 right-0 overflow-hidden opacity-[0.03] pointer-events-none">
             <ParallaxText baseVelocity={-2} className={cn("text-[150px] font-black uppercase tracking-tighter text-white", manrope.className)}>
               Neural Architect • System Engineer • AI Builder •
             </ParallaxText>
