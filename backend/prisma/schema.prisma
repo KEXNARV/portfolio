@@ -6,6 +6,24 @@ datasource db {
   provider = "postgresql"
 }
 
+model Hero {
+  id              Int      @id @default(autoincrement())
+  title           String
+  subtitle        String
+  description     String
+  ctaPrimaryText  String   @default("View Projects")
+  ctaPrimaryLink  String   @default("#projects")
+  ctaSecondaryText String  @default("Contact Me")
+  ctaSecondaryLink String  @default("#contact")
+  backgroundType  String   @default("solid") // solid, gradient, image
+  backgroundColor String   @default("#0a0a0a")
+  gradientFrom    String   @default("#0a0a0a")
+  gradientTo      String   @default("#1a1a2e")
+  backgroundImage String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model Profile {
   id          Int      @id @default(autoincrement())
   name        String
