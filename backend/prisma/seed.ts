@@ -43,24 +43,99 @@ async function main() {
   // 3. Projects
   const projectsData = [
     {
-      title: 'Neural Bridge API',
-      description: 'High-throughput inference API connecting LLMs with legacy enterprise systems. Handles 50k+ req/s with <50ms latency.',
-      techStack: ['Python', 'FastAPI', 'Redis', 'Docker'],
+      title: "AI-Powered Document Processing Pipeline",
+      description: "Built end-to-end ML pipeline with OCR, NLP classification, and automated routing using transformer models",
+      codename: "CORTEX",
+      status: "DEPLOYED",
+      classification: "MACHINE LEARNING",
+      problem: "Manual document processing causing 72-hour delays in enterprise workflow",
+      solution: "Built end-to-end ML pipeline with OCR, NLP classification, and automated routing using transformer models",
+      impact: "Reduced processing time from 72hrs to 4min. 99.2% accuracy on classification tasks",
+      techStack: ["Python", "PyTorch", "FastAPI", "Redis", "PostgreSQL", "Docker", "AWS Lambda"],
       featured: true,
+      metrics: [
+        { label: "Processing Time", value: "-99.9%" },
+        { label: "Accuracy", value: "99.2%" },
+        { label: "Documents/Day", value: "50K+" }
+      ]
     },
     {
-      title: 'Sentient Dashboard',
-      description: 'Real-time visualization of neural network states using WebGL and WebSockets. A window into the black box.',
-      techStack: ['Next.js', 'Three.js', 'Socket.io', 'NestJS'],
+      title: "Real-time Recommendation Engine",
+      description: "Implemented hybrid collaborative filtering with real-time feature store and A/B testing framework",
+      codename: "NEXUS",
+      status: "DEPLOYED",
+      classification: "DISTRIBUTED SYSTEMS",
+      problem: "Static recommendations failing to capture user intent, low engagement rates",
+      solution: "Implemented hybrid collaborative filtering with real-time feature store and A/B testing framework",
+      impact: "Increased CTR by 340%. Reduced latency from 200ms to 12ms p99",
+      techStack: ["Go", "Apache Kafka", "Redis", "TensorFlow Serving", "Kubernetes", "Prometheus"],
       featured: true,
+      metrics: [
+        { label: "CTR Increase", value: "+340%" },
+        { label: "Latency p99", value: "12ms" },
+        { label: "Daily Users", value: "2M+" }
+      ]
     },
     {
-      title: 'Auto-Scaler V2',
-      description: 'Predictive scaling engine for Kubernetes clusters based on incoming traffic patterns and model load.',
-      techStack: ['Go', 'Kubernetes', 'Prometheus', 'Terraform'],
+      title: "Anomaly Detection & Alert System",
+      description: "Designed multi-model ensemble with LSTM autoencoders for time-series anomaly detection",
+      codename: "SENTINEL",
+      status: "DEPLOYED",
+      classification: "MLOPS / MONITORING",
+      problem: "Critical infrastructure failures going undetected for hours, causing cascading outages",
+      solution: "Designed multi-model ensemble with LSTM autoencoders for time-series anomaly detection",
+      impact: "Detected 94% of incidents before user impact. MTTR reduced by 67%",
+      techStack: ["Python", "Keras", "Apache Flink", "InfluxDB", "Grafana", "PagerDuty API"],
       featured: false,
+      metrics: [
+        { label: "Detection Rate", value: "94%" },
+        { label: "MTTR Reduction", value: "-67%" },
+        { label: "False Positives", value: "<2%" }
+      ]
     },
+    {
+      title: "Conversational AI Assistant Platform",
+      description: "Building RAG-based assistant with fine-tuned LLM, semantic search, and human-in-the-loop escalation",
+      codename: "ORACLE",
+      status: "IN_PROGRESS",
+      classification: "LLM / NLP",
+      problem: "Customer support overwhelmed with repetitive queries, 45min average response time",
+      solution: "Building RAG-based assistant with fine-tuned LLM, semantic search, and human-in-the-loop escalation",
+      impact: "Target: 80% query resolution without human intervention",
+      techStack: ["Python", "LangChain", "OpenAI API", "Pinecone", "Next.js", "WebSocket"],
+      featured: false,
+      metrics: [
+        { label: "Auto-Resolution", value: "80%" },
+        { label: "Response Time", value: "<3s" },
+        { label: "Satisfaction", value: "4.8/5" }
+      ]
+    },
+    {
+      title: "Face Recognition Attendance System",
+      description: "Enterprise-grade facial recognition system for automated employee time tracking with anti-spoofing",
+      codename: "KRONOS",
+      status: "DEPLOYED",
+      classification: "COMPUTER VISION / BIOMETRICS",
+      problem: "Manual clock-in/out causing 15% payroll discrepancies, buddy-punching fraud costing $200K annually, no real-time attendance visibility",
+      solution: "Deployed multi-stage facial recognition pipeline with liveness detection, 3D depth mapping anti-spoofing, edge computing for sub-200ms response, real-time dashboard with anomaly alerts, and automatic payroll integration",
+      impact: "Eliminated buddy-punching fraud saving $200K/year. 99.7% recognition accuracy. Reduced HR payroll processing time by 85%. Real-time attendance visibility across 12 locations",
+      techStack: ["Python", "OpenCV", "dlib", "TensorFlow", "FastAPI", "Redis", "PostgreSQL", "React", "WebSocket", "Docker"],
+      featured: true,
+      demoUrl: "https://demo-attendance.example.com",
+      repoUrl: "https://github.com/kevinnarvaez/face-attendance-system",
+      metrics: [
+        { label: "Recognition Accuracy", value: "99.7%" },
+        { label: "Response Time", value: "180ms" },
+        { label: "Fraud Reduction", value: "100%" },
+        { label: "Daily Check-ins", value: "5K+" },
+        { label: "Cost Savings", value: "$200K/yr" },
+        { label: "Locations", value: "12" }
+      ]
+    }
   ];
+
+  // Clear existing projects first
+  await prisma.project.deleteMany();
 
   for (const project of projectsData) {
     await prisma.project.create({ data: project });

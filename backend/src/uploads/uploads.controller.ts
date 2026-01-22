@@ -5,30 +5,22 @@ import {
   UploadedFile,
   Get,
   Param,
-  Res,
   Delete,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import * as express from 'express';
-import { existsSync, unlinkSync, readdirSync } from 'fs';
+import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-
-const uploadsPath = join(__dirname, '..', '..', 'uploads');
+import { MinioService } from '../minio/minio.service';
 
 @Controller('uploads')
 export class UploadsController {
+  constructor(private readonly minioService: MinioService) {}
+
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: uploadsPath,
-        filename: (req, file, callback) => {
-          const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
-          callback(null, uniqueName);
-        },
-      }),
       fileFilter: (req, file, callback) => {
         if (!file.mimetype.match(/^image\/(jpeg|png|gif|webp|svg\+xml)$/)) {
           return callback(new Error('Only image files are allowed'), false);
@@ -40,45 +32,58 @@ export class UploadsController {
       },
     }),
   )
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
-    return {
-      filename: file.filename,
-      url: `/uploads/${file.filename}`,
-      size: file.size,
-      mimetype: file.mimetype,
-    };
+  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+
+    try {
+      await this.minioService.uploadFile(file, uniqueName);
+      const url = this.minioService.getPublicUrl(uniqueName);
+
+      return {
+        filename: uniqueName,
+        url,
+        size: file.size,
+        mimetype: file.mimetype,
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to upload file');
+    }
   }
 
   @Get()
-  listFiles() {
-    if (!existsSync(uploadsPath)) {
+  async listFiles() {
+    try {
+      const files = await this.minioService.listFiles();
+      return files.map((filename) => ({
+        filename,
+        url: this.minioService.getPublicUrl(filename),
+      }));
+    } catch (error) {
       return [];
     }
-    const files = readdirSync(uploadsPath);
-    return files
-      .filter((f) => !f.startsWith('.'))
-      .map((filename) => ({
-        filename,
-        url: `/uploads/${filename}`,
-      }));
   }
 
   @Get(':filename')
-  getFile(@Param('filename') filename: string, @Res() res: express.Response) {
-    const filePath = join(uploadsPath, filename);
-    if (!existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found' });
+  async getFile(@Param('filename') filename: string) {
+    try {
+      const url = await this.minioService.getFileUrl(filename);
+      return { url };
+    } catch (error) {
+      throw new NotFoundException('File not found');
     }
-    return res.sendFile(filePath);
   }
 
   @Delete(':filename')
-  deleteFile(@Param('filename') filename: string) {
-    const filePath = join(uploadsPath, filename);
-    if (!existsSync(filePath)) {
-      return { error: 'File not found' };
+  async deleteFile(@Param('filename') filename: string) {
+    try {
+      await this.minioService.deleteFile(filename);
+      return { success: true, deleted: filename };
+    } catch (error) {
+      throw new NotFoundException('File not found');
     }
-    unlinkSync(filePath);
-    return { success: true, deleted: filename };
   }
 }

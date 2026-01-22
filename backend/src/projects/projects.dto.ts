@@ -6,6 +6,14 @@ export class CreateProjectDto {
   demoUrl?: string;
   repoUrl?: string;
   featured?: boolean;
+  // Industrial theme fields
+  codename?: string;
+  status?: string;
+  classification?: string;
+  problem?: string;
+  solution?: string;
+  impact?: string;
+  metrics?: any; // JSON array of {label, value}
 }
 
 export class UpdateProjectDto {
@@ -16,10 +24,19 @@ export class UpdateProjectDto {
   demoUrl?: string;
   repoUrl?: string;
   featured?: boolean;
+  // Industrial theme fields
+  codename?: string;
+  status?: string;
+  classification?: string;
+  problem?: string;
+  solution?: string;
+  impact?: string;
+  metrics?: any; // JSON array of {label, value}
 }
 
 export class ProjectDto {
   id: number;
+  slug: string | null;
   title: string;
   description: string;
   imageUrl: string | null;
@@ -27,6 +44,14 @@ export class ProjectDto {
   demoUrl: string | null;
   repoUrl: string | null;
   featured: boolean;
+  // Industrial theme fields
+  codename: string | null;
+  status: string | null;
+  classification: string | null;
+  problem: string | null;
+  solution: string | null;
+  impact: string | null;
+  metrics: any | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,20 +1,65 @@
 "use client";
 
 import React, { useRef, useState, useMemo, useEffect } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html, Line } from "@react-three/drei";
 import * as THREE from "three";
 import { Project } from "@/data/projects";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Space_Mono } from "next/font/google";
+import { useRouter } from "next/navigation";
 
 const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"] });
 
+// --- Glitch Text Component ---
+const GlitchText = ({ children, className, delay = 0 }: { children: string; className?: string; delay?: number }) => {
+  return (
+    <motion.span
+      className={className}
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: [0, 1, 0.3, 1, 0.5, 1],
+        x: [0, -2, 2, 0, -1, 0],
+        textShadow: [
+          "0 0 0 rgba(0,0,0,0)",
+          "2px 0 #ff0000, -2px 0 #00ffff",
+          "-2px 0 #ff0000, 2px 0 #00ffff",
+          "1px 0 #ff0000, -1px 0 #00ffff",
+          "0 0 0 rgba(0,0,0,0)",
+          "0 0 0 rgba(0,0,0,0)",
+        ]
+      }}
+      transition={{
+        duration: 0.6,
+        delay: delay,
+        times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+        ease: "easeOut"
+      }}
+    >
+      {children}
+    </motion.span>
+  );
+};
+
 // --- UTILS ---
 function generateOrbitalPoints(count: number, baseRadius: number) {
-  const points = [];
+  const points: any[] = [];
   const phi = Math.PI * (3 - Math.sqrt(5));
+
+  // Handle edge case: single point
+  if (count === 0) return points;
+  if (count === 1) {
+    points.push({
+      basePosition: new THREE.Vector3(baseRadius, 0, 0),
+      orbitSpeed: 0.1 + Math.random() * 0.15,
+      orbitRadius: 0.3 + Math.random() * 0.4,
+      orbitPhase: Math.random() * Math.PI * 2,
+      floatSpeed: 0.5 + Math.random() * 0.5,
+      floatAmount: 0.1 + Math.random() * 0.15,
+    });
+    return points;
+  }
 
   for (let i = 0; i < count; i++) {
     const y = 1 - (i / (count - 1)) * 2;
@@ -117,25 +162,81 @@ const PhysicsLine = ({
   selected: boolean;
 }) => {
   const lineRef = useRef<THREE.Line>(null);
-  const [points, setPoints] = useState<THREE.Vector3[]>([start, end]);
+  const [points, setPoints] = useState<THREE.Vector3[]>(() => {
+    // Validate initial points
+    if (!start || !end || isNaN(start.x) || isNaN(end.x)) {
+      return [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)];
+    }
+    return [start.clone(), end.clone()];
+  });
 
   useFrame(() => {
-    // Create slight curve based on distance
-    const mid = start.clone().add(end).multiplyScalar(0.5);
-    const dist = start.distanceTo(end);
-    const perpendicular = new THREE.Vector3()
-      .crossVectors(
-        end.clone().sub(start).normalize(),
-        new THREE.Vector3(0, 1, 0)
-      )
-      .normalize();
+    // Validate input vectors
+    if (!start || !end || isNaN(start.x) || isNaN(start.y) || isNaN(start.z) ||
+      isNaN(end.x) || isNaN(end.y) || isNaN(end.z)) {
+      return;
+    }
 
-    const curve = new THREE.QuadraticBezierCurve3(
-      start,
-      mid.add(perpendicular.multiplyScalar(dist * 0.05)),
-      end
-    );
-    setPoints(curve.getPoints(10));
+    // Create slight curve based on distance
+    const dist = start.distanceTo(end);
+
+    // If points are too close or distance is invalid, just draw a straight line
+    if (isNaN(dist) || dist < 0.01) {
+      setPoints([start.clone(), end.clone()]);
+      return;
+    }
+
+    try {
+      const mid = start.clone().add(end).multiplyScalar(0.5);
+      const direction = end.clone().sub(start).normalize();
+
+      // Calculate perpendicular vector
+      let perpendicular = new THREE.Vector3()
+        .crossVectors(direction, new THREE.Vector3(0, 1, 0));
+
+      // If parallel to Y-axis, use a different axis
+      if (perpendicular.lengthSq() < 0.0001) {
+        perpendicular.crossVectors(direction, new THREE.Vector3(1, 0, 0));
+      }
+
+      // Validate perpendicular before normalizing
+      if (perpendicular.lengthSq() < 0.0001) {
+        // Fallback to straight line if we can't find a valid perpendicular
+        setPoints([start.clone(), end.clone()]);
+        return;
+      }
+
+      perpendicular.normalize();
+
+      // Validate normalized perpendicular
+      if (isNaN(perpendicular.x) || isNaN(perpendicular.y) || isNaN(perpendicular.z)) {
+        setPoints([start.clone(), end.clone()]);
+        return;
+      }
+
+      const controlPoint = mid.add(perpendicular.multiplyScalar(dist * 0.05));
+
+      // Validate control point
+      if (isNaN(controlPoint.x) || isNaN(controlPoint.y) || isNaN(controlPoint.z)) {
+        setPoints([start.clone(), end.clone()]);
+        return;
+      }
+
+      const curve = new THREE.QuadraticBezierCurve3(start, controlPoint, end);
+      const curvePoints = curve.getPoints(10);
+
+      // Validate curve points
+      const validPoints = curvePoints.every(p =>
+        !isNaN(p.x) && !isNaN(p.y) && !isNaN(p.z)
+      );
+
+      if (validPoints) {
+        setPoints(curvePoints);
+      }
+    } catch (error) {
+      // Fallback to straight line on any error
+      setPoints([start.clone(), end.clone()]);
+    }
   });
 
   return (
@@ -179,7 +280,15 @@ const AnimatedNode = ({
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Mesh>(null);
-  const [currentPosition, setCurrentPosition] = useState(basePosition.clone());
+  const outerRingRef = useRef<THREE.Mesh>(null);
+  const [currentPosition, setCurrentPosition] = useState(() => {
+    // Validate basePosition
+    if (!basePosition || isNaN(basePosition.x)) {
+      console.error("Invalid basePosition for project:", project.codename);
+      return new THREE.Vector3(0, 0, 0);
+    }
+    return basePosition.clone();
+  });
 
   useFrame((state) => {
     if (groupRef.current) {
@@ -201,14 +310,19 @@ const AnimatedNode = ({
       groupRef.current.position.copy(newPos);
       setCurrentPosition(newPos);
 
-      // Rotate node
-      groupRef.current.rotation.x += 0.01;
-      groupRef.current.rotation.y += 0.015;
+      // Rotate node - subtle
+      groupRef.current.rotation.x += 0.008;
+      groupRef.current.rotation.y += 0.012;
 
       // Pulse glow when active
       if (glowRef.current && (isHovered || isSelected)) {
-        const pulse = Math.sin(time * 4) * 0.3 + 1;
+        const pulse = Math.sin(time * 3) * 0.2 + 1;
         glowRef.current.scale.setScalar(pulse);
+      }
+
+      // Rotate outer ring slowly
+      if (outerRingRef.current) {
+        outerRingRef.current.rotation.z = time * 0.8;
       }
     }
   });
@@ -240,30 +354,43 @@ const AnimatedNode = ({
 
         {/* Inner core */}
         <mesh>
-          <octahedronGeometry args={[isActive ? 0.18 : 0.12, 0]} />
+          <octahedronGeometry args={[isActive ? 0.16 : 0.12, 0]} />
           <meshStandardMaterial
             color={nodeColor}
             emissive={nodeColor}
-            emissiveIntensity={isActive ? 1.5 : 0.5}
+            emissiveIntensity={isSelected ? 1.8 : isActive ? 1.2 : 0.5}
           />
         </mesh>
 
         {/* Wireframe shell */}
         <mesh>
-          <octahedronGeometry args={[isActive ? 0.28 : 0.2, 0]} />
-          <meshBasicMaterial color={nodeColor} wireframe transparent opacity={0.8} />
+          <octahedronGeometry args={[isActive ? 0.26 : 0.2, 0]} />
+          <meshBasicMaterial color={nodeColor} wireframe transparent opacity={0.7} />
         </mesh>
 
-        {/* Outer ring */}
+        {/* Main ring */}
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[isActive ? 0.35 : 0.28, isActive ? 0.38 : 0.3, isActive ? 32 : 6]} />
+          <ringGeometry args={[isActive ? 0.33 : 0.28, isActive ? 0.36 : 0.3, 32]} />
           <meshBasicMaterial
             color={nodeColor}
             transparent
-            opacity={isActive ? 0.8 : 0.4}
+            opacity={isActive ? 0.7 : 0.4}
             side={THREE.DoubleSide}
           />
         </mesh>
+
+        {/* Outer ring for selected only */}
+        {isSelected && (
+          <mesh ref={outerRingRef} rotation={[Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.48, 0.5, 32]} />
+            <meshBasicMaterial
+              color="#FF3B30"
+              transparent
+              opacity={0.4}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        )}
 
         {/* Glow effect when active */}
         {isActive && (
@@ -272,7 +399,20 @@ const AnimatedNode = ({
             <meshBasicMaterial
               color={glowColor}
               transparent
-              opacity={0.15}
+              opacity={isSelected ? 0.2 : 0.12}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+        )}
+
+        {/* Single scanning ring for selected node */}
+        {isSelected && (
+          <mesh rotation={[0, 0, 0]}>
+            <torusGeometry args={[0.7, 0.015, 8, 32]} />
+            <meshBasicMaterial
+              color="#FF3B30"
+              transparent
+              opacity={0.4}
               blending={THREE.AdditiveBlending}
             />
           </mesh>
@@ -281,32 +421,72 @@ const AnimatedNode = ({
         {/* Tooltip on hover */}
         {isHovered && !isSelected && (
           <Html position={[0, 0.7, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-            <div className={cn(
-              "text-[10px] font-mono px-2 py-1.5 whitespace-nowrap rounded-sm",
-              "bg-black/90 backdrop-blur-sm border border-white/20",
-              spaceMono.className
-            )}>
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15 }}
+              className={cn(
+                "text-[10px] font-mono px-2 py-1.5 whitespace-nowrap",
+                "bg-black/90 backdrop-blur-sm border border-white/20",
+                spaceMono.className
+              )}
+            >
               <div className="text-white font-medium">{project.codename}</div>
-              <div className="text-neutral-500 text-[9px]">{project.id}</div>
-            </div>
+              <div className="text-neutral-500 text-[8px] mt-0.5">{project.id}</div>
+            </motion.div>
           </Html>
         )}
 
-        {/* Selected indicator */}
+        {/* Selected indicator - subtle */}
         {isSelected && (
-          <Html position={[0, 0.6, 0]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
-            <div className={cn(
-              "text-[9px] font-mono px-1.5 py-0.5 whitespace-nowrap rounded-sm",
-              "text-[#FF3B30] bg-black/60 backdrop-blur-sm border border-[#FF3B30]/30",
-              spaceMono.className
-            )}>
+          <Html position={[0, 0.7, 0]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "text-[8px] font-mono px-1.5 py-0.5 whitespace-nowrap uppercase tracking-wider",
+                "text-[#FF3B30] bg-black/80 backdrop-blur-sm border border-[#FF3B30]/40",
+                spaceMono.className
+              )}
+            >
               SELECTED
-            </div>
+            </motion.div>
           </Html>
         )}
       </group>
     </>
   );
+};
+
+// --- Camera Controller for tracking selected node ---
+const CameraController = ({ targetPosition, enabled }: { targetPosition: THREE.Vector3 | null; enabled: boolean }) => {
+  const controlsRef = useRef<any>(null);
+
+  useFrame(() => {
+    if (controlsRef.current && enabled && targetPosition) {
+      // Very subtle tracking - just adjust the look-at target slightly
+      const targetLookAt = targetPosition.clone();
+      const currentTarget = controlsRef.current.target;
+
+      // Slow, smooth interpolation
+      currentTarget.lerp(targetLookAt, 0.02);
+      controlsRef.current.update();
+    }
+  });
+
+  return <OrbitControls
+    ref={controlsRef}
+    enableZoom={true}
+    enablePan={false}
+    autoRotate={!enabled}
+    autoRotateSpeed={0.15}
+    minDistance={5}
+    maxDistance={18}
+    minPolarAngle={0.2}
+    maxPolarAngle={Math.PI - 0.2}
+    enableDamping
+    dampingFactor={0.05}
+  />;
 };
 
 // --- Central Core ---
@@ -410,9 +590,30 @@ const Scene = ({
   setSelectedProject: (p: Project | null) => void;
   onCoreClick: () => void;
 }) => {
-  const orbitalData = useMemo(() => generateOrbitalPoints(projects.length, 4), [projects.length]);
+  const orbitalData = useMemo(() => {
+    console.log("Scene: Generating orbital data for", projects.length, "projects");
+    return generateOrbitalPoints(projects.length, 4);
+  }, [projects.length]);
   const corePos = useMemo(() => new THREE.Vector3(0, 0, 0), []);
   const [coreHovered, setCoreHovered] = useState(false);
+  const [selectedNodePosition, setSelectedNodePosition] = useState<THREE.Vector3 | null>(null);
+
+  useEffect(() => {
+    console.log("Scene: projects array:", projects);
+    console.log("Scene: orbitalData length:", orbitalData.length);
+  }, [projects, orbitalData]);
+
+  // Find the position of the selected node
+  useEffect(() => {
+    if (selectedId) {
+      const selectedIndex = projects.findIndex(p => p.id === selectedId);
+      if (selectedIndex !== -1 && orbitalData[selectedIndex]) {
+        setSelectedNodePosition(orbitalData[selectedIndex].basePosition);
+      }
+    } else {
+      setSelectedNodePosition(null);
+    }
+  }, [selectedId, projects, orbitalData]);
 
   const handleNodeClick = (project: Project) => {
     if (selectedId === project.id) {
@@ -446,31 +647,28 @@ const Scene = ({
       />
 
       {/* Animated nodes */}
-      {projects.map((project, i) => (
-        <AnimatedNode
-          key={project.id}
-          basePosition={orbitalData[i].basePosition}
-          orbitData={orbitalData[i]}
-          project={project}
-          isHovered={hoveredId === project.id}
-          isSelected={selectedId === project.id}
-          onHover={setHoveredProject}
-          onLeave={() => setHoveredProject(null)}
-          onClick={handleNodeClick}
-          corePosition={corePos}
-        />
-      ))}
+      {projects.map((project, i) => {
+        console.log("Rendering node for project:", project.codename, "at index:", i);
+        return (
+          <AnimatedNode
+            key={project.id}
+            basePosition={orbitalData[i]?.basePosition}
+            orbitData={orbitalData[i]}
+            project={project}
+            isHovered={hoveredId === project.id}
+            isSelected={selectedId === project.id}
+            onHover={setHoveredProject}
+            onLeave={() => setHoveredProject(null)}
+            onClick={handleNodeClick}
+            corePosition={corePos}
+          />
+        );
+      })}
 
-      {/* Controls */}
-      <OrbitControls
-        enableZoom={true}
-        enablePan={false}
-        autoRotate
-        autoRotateSpeed={0.15}
-        minDistance={5}
-        maxDistance={18}
-        minPolarAngle={0.2}
-        maxPolarAngle={Math.PI - 0.2}
+      {/* Camera Controls with tracking */}
+      <CameraController
+        targetPosition={selectedNodePosition}
+        enabled={selectedNodePosition !== null}
       />
 
     </>
@@ -479,7 +677,8 @@ const Scene = ({
 
 // --- MAIN COMPONENT ---
 
-export const MissionIndex3D = ({ projects, onClose }: { projects: Project[]; onClose: () => void }) => {
+export const MissionIndex3D = ({ projects, onClose, onProjectSelect }: { projects: Project[]; onClose: () => void; onProjectSelect: (p: Project) => void }) => {
+  const router = useRouter();
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -487,6 +686,12 @@ export const MissionIndex3D = ({ projects, onClose }: { projects: Project[]; onC
   const [showCanvas, setShowCanvas] = useState(false);
   const [glitchFlash, setGlitchFlash] = useState(false);
   const [scanLinePos, setScanLinePos] = useState(0);
+
+  // Debug: Log projects on mount
+  useEffect(() => {
+    console.log("MissionIndex3D received projects:", projects);
+    console.log("Projects count:", projects.length);
+  }, [projects]);
 
   useEffect(() => {
     if (!showCanvas) return;
@@ -626,94 +831,222 @@ export const MissionIndex3D = ({ projects, onClose }: { projects: Project[]; onC
       )}
 
       {/* Selected Project Card */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {selectedProject && (
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-16 left-4 w-80 z-20"
+            key={selectedProject.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+            className="absolute top-16 left-4 w-[360px] z-20"
           >
-            <div className="bg-black/90 backdrop-blur-xl border border-[#FF3B30]/30 rounded-sm overflow-hidden shadow-[0_0_30px_-10px_rgba(255,59,48,0.3)]">
-              <div className="border-b border-[#FF3B30]/20 px-4 py-3 flex justify-between items-center bg-[#FF3B30]/5">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#FF3B30]" />
-                  <span className="text-[11px] text-[#FF3B30] font-bold">{selectedProject.id}</span>
+            <div
+              className="relative bg-black border-2 border-[#FF3B30]/40 overflow-hidden shadow-[0_0_40px_-5px_rgba(255,59,48,0.4)]"
+              style={{
+                clipPath: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))"
+              }}
+            >
+              {/* Corner cuts decorative elements */}
+              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#FF3B30]" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#FF3B30]" />
+
+              {/* Scan line effect */}
+              <motion.div
+                className="absolute inset-0 pointer-events-none z-10"
+                initial={{ top: "-100%" }}
+                animate={{ top: "100%" }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                style={{
+                  background: "linear-gradient(180deg, transparent 0%, rgba(255,59,48,0.1) 50%, transparent 100%)",
+                  height: "30%"
+                }}
+              />
+
+              {/* Header */}
+              <div className="relative border-b-2 border-[#FF3B30]/30 px-4 py-2.5 bg-gradient-to-r from-[#FF3B30]/10 to-transparent">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      className="relative"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: [0, 1, 0.5, 1] }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="w-1.5 h-1.5 bg-[#FF3B30] animate-pulse" />
+                      <div className="absolute inset-0 w-1.5 h-1.5 bg-[#FF3B30] animate-ping" />
+                    </motion.div>
+                    <GlitchText className="text-[8px] text-[#FF3B30] font-bold tracking-[0.2em]" delay={0}>
+                      CLASSIFIED
+                    </GlitchText>
+                    <div className="h-3 w-px bg-[#FF3B30]/50" />
+                    <GlitchText className="text-[8px] text-neutral-500 tracking-wider" delay={0.03}>
+                      CLEARANCE: OMEGA
+                    </GlitchText>
+                  </div>
+                  <button
+                    onClick={() => setSelectedProject(null)}
+                    className="text-neutral-600 hover:text-[#FF3B30] text-[10px] w-5 h-5 flex items-center justify-center border border-neutral-700 hover:border-[#FF3B30] transition-colors"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button
-                  onClick={() => setSelectedProject(null)}
-                  className="text-neutral-500 hover:text-white text-xs px-2 py-0.5 hover:bg-white/10 rounded-sm transition-colors"
-                >
-                  ✕
-                </button>
+                <div className="flex items-baseline gap-2">
+                  <GlitchText className="text-[13px] text-white font-bold tracking-wider relative">
+                    {selectedProject.codename}
+                  </GlitchText>
+                  <GlitchText className="text-[8px] text-neutral-600 tracking-widest" delay={0.05}>
+                    {`ID:${selectedProject.id}`}
+                  </GlitchText>
+                </div>
               </div>
 
-              <div className="p-4 space-y-4">
-                <div>
-                  <div className="text-[9px] text-neutral-600 uppercase tracking-wider mb-1">Codename</div>
-                  <div className="text-lg text-white font-bold">{selectedProject.codename}</div>
+              {/* Content */}
+              <div className="p-4 space-y-3">
+                {/* Mission Title */}
+                <div className="border-l-2 border-[#FF3B30]/50 pl-3 py-1 bg-[#FF3B30]/5">
+                  <GlitchText className="text-[7px] text-[#FF3B30] uppercase tracking-[0.15em] mb-0.5 font-bold block" delay={0.1}>
+                    MISSION DESIGNATION
+                  </GlitchText>
+                  <GlitchText className="text-[11px] text-neutral-200 leading-tight font-medium block" delay={0.15}>
+                    {selectedProject.title}
+                  </GlitchText>
                 </div>
 
-                <div>
-                  <div className="text-[9px] text-neutral-600 uppercase tracking-wider mb-1">Objective</div>
-                  <div className="text-[12px] text-neutral-300 leading-relaxed">{selectedProject.title}</div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[9px] text-neutral-600 uppercase tracking-wider mb-1">Status</div>
-                    <div className={cn(
-                      "text-[12px] font-bold",
-                      selectedProject.status === "DEPLOYED" ? "text-emerald-400" :
-                      selectedProject.status === "IN_PROGRESS" ? "text-amber-400" : "text-neutral-500"
-                    )}>
-                      {selectedProject.status}
+                {/* Status Grid */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="border border-neutral-800 bg-black/40 p-2">
+                    <GlitchText className="text-[7px] text-neutral-600 uppercase tracking-[0.15em] mb-1 font-bold block" delay={0.2}>
+                      OPERATIONAL STATUS
+                    </GlitchText>
+                    <div className="flex items-center gap-1.5">
+                      <motion.div
+                        className={cn(
+                          "w-1.5 h-1.5",
+                          selectedProject.status === "DEPLOYED" ? "bg-[#00ff00]" :
+                            selectedProject.status === "IN_PROGRESS" ? "bg-[#ffaa00]" : "bg-neutral-600"
+                        )}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: [0, 1, 0.5, 1] }}
+                        transition={{ duration: 0.4, delay: 0.25 }}
+                      />
+                      <GlitchText
+                        className={cn(
+                          "text-[10px] font-bold tracking-wider",
+                          selectedProject.status === "DEPLOYED" ? "text-[#00ff00]" :
+                            selectedProject.status === "IN_PROGRESS" ? "text-[#ffaa00]" : "text-neutral-500"
+                        )}
+                        delay={0.25}
+                      >
+                        {selectedProject.status}
+                      </GlitchText>
                     </div>
                   </div>
-                  {selectedProject.metrics?.[0] && (
-                    <div>
-                      <div className="text-[9px] text-neutral-600 uppercase tracking-wider mb-1">{selectedProject.metrics[0].label}</div>
-                      <div className="text-[12px] text-white font-bold">{selectedProject.metrics[0].value}</div>
-                    </div>
-                  )}
+
+                  <div className="border border-neutral-800 bg-black/40 p-2">
+                    <GlitchText className="text-[7px] text-neutral-600 uppercase tracking-[0.15em] mb-1 font-bold block" delay={0.22}>
+                      CLASSIFICATION
+                    </GlitchText>
+                    <GlitchText className="text-[10px] text-amber-400 font-bold tracking-wider block" delay={0.27}>
+                      {selectedProject.classification}
+                    </GlitchText>
+                  </div>
                 </div>
 
-                <div>
-                  <div className="text-[9px] text-neutral-600 uppercase tracking-wider mb-2">Stack</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedProject.stack.map(t => (
-                      <span key={t} className="text-[9px] px-2 py-1 border border-white/10 text-neutral-400 bg-white/[0.03] rounded-sm">
+                {/* Metrics */}
+                {selectedProject.metrics && selectedProject.metrics.length > 0 && (
+                  <div className="border-t border-neutral-800 pt-3">
+                    <GlitchText className="text-[7px] text-neutral-600 uppercase tracking-[0.15em] mb-2 font-bold block" delay={0.3}>
+                      PERFORMANCE METRICS
+                    </GlitchText>
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedProject.metrics.slice(0, 3).map((metric, idx) => (
+                        <div key={idx} className="bg-neutral-900/50 border border-neutral-800 p-1.5">
+                          <GlitchText className="text-[7px] text-neutral-600 uppercase mb-0.5 block" delay={0.35 + idx * 0.05}>
+                            {metric.label}
+                          </GlitchText>
+                          <GlitchText className="text-[11px] text-[#00ff00] font-bold tabular-nums block" delay={0.4 + idx * 0.05}>
+                            {metric.value}
+                          </GlitchText>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tech Stack */}
+                <div className="border-t border-neutral-800 pt-3">
+                  <GlitchText className="text-[7px] text-neutral-600 uppercase tracking-[0.15em] mb-2 font-bold block" delay={0.5}>
+                    TECHNOLOGY STACK
+                  </GlitchText>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProject.stack.map((t, idx) => (
+                      <GlitchText key={t} className="text-[8px] px-1.5 py-0.5 border border-neutral-700 text-neutral-400 bg-neutral-900/50 font-mono tracking-wider inline-block" delay={0.55 + idx * 0.02}>
                         {t}
-                      </span>
+                      </GlitchText>
                     ))}
                   </div>
                 </div>
 
-                {(selectedProject.link || selectedProject.github) && (
-                  <div className="pt-2 flex gap-2">
-                    {selectedProject.link && (
-                      <a
-                        href={selectedProject.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 text-center text-[10px] py-2 bg-[#FF3B30] text-white font-bold uppercase tracking-wider hover:bg-[#FF3B30]/80 transition-colors rounded-sm"
-                      >
-                        View Demo
-                      </a>
-                    )}
-                    {selectedProject.github && (
-                      <a
-                        href={selectedProject.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 text-center text-[10px] py-2 border border-white/20 text-neutral-300 font-bold uppercase tracking-wider hover:bg-white/10 transition-colors rounded-sm"
-                      >
-                        Source
-                      </a>
-                    )}
-                  </div>
-                )}
+                {/* Action Buttons */}
+                <div className="pt-2 space-y-1.5 border-t-2 border-[#FF3B30]/20">
+                  <motion.button
+                    onClick={() => onProjectSelect(selectedProject)}
+                    className="w-full relative text-center text-[9px] py-2.5 bg-[#FF3B30] text-black font-bold uppercase tracking-[0.2em] hover:bg-[#ff5544] transition-all group overflow-hidden"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 1, 0.7, 1] }}
+                    transition={{ duration: 0.4, delay: 0.6 }}
+                    whileHover={{
+                      boxShadow: "0 0 20px rgba(255,59,48,0.6), inset 0 0 20px rgba(255,255,255,0.2)"
+                    }}
+                  >
+                    <GlitchText className="relative z-10" delay={0.65}>
+                      ▸ ACCESS FULL DOSSIER
+                    </GlitchText>
+                    <motion.div
+                      className="absolute inset-0 bg-white"
+                      initial={{ x: "-100%" }}
+                      whileHover={{ x: "100%" }}
+                      transition={{ duration: 0.5 }}
+                      style={{ opacity: 0.2 }}
+                    />
+                  </motion.button>
+
+                  {(selectedProject.link || selectedProject.github) && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {selectedProject.link && (
+                        <a
+                          href={selectedProject.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-center text-[8px] py-2 border border-neutral-700 text-neutral-400 font-bold uppercase tracking-[0.15em] hover:bg-neutral-800 hover:border-neutral-500 hover:text-neutral-200 transition-all"
+                        >
+                          LIVE DEMO
+                        </a>
+                      )}
+                      {selectedProject.github && (
+                        <a
+                          href={selectedProject.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-center text-[8px] py-2 border border-neutral-700 text-neutral-400 font-bold uppercase tracking-[0.15em] hover:bg-neutral-800 hover:border-neutral-500 hover:text-neutral-200 transition-all"
+                        >
+                          SOURCE CODE
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer stamp */}
+              <div className="border-t border-neutral-800 px-4 py-1.5 bg-black/60 flex justify-between items-center">
+                <GlitchText className="text-[7px] text-neutral-700 tracking-[0.2em]" delay={0.7}>
+                  AUTHORIZED PERSONNEL ONLY
+                </GlitchText>
+                <GlitchText className="text-[7px] text-neutral-700 font-mono" delay={0.75}>
+                  {timestamp.split(' ')[0]}
+                </GlitchText>
               </div>
             </div>
           </motion.div>
@@ -721,71 +1054,182 @@ export const MissionIndex3D = ({ projects, onClose }: { projects: Project[]; onC
       </AnimatePresence>
 
       {/* Project Selector Sidebar */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {showSidebar && (
           <motion.div
-            initial={{ opacity: 0, x: 300 }}
+            initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 300 }}
-            transition={{ duration: 0.2 }}
-            className="absolute top-0 right-0 bottom-0 w-80 z-30 bg-black/95 backdrop-blur-xl border-l border-white/10 flex flex-col"
+            exit={{ opacity: 0, x: 50 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-0 right-0 bottom-0 w-[400px] z-30 flex flex-col"
           >
-            <div className="border-b border-white/10 px-4 py-4 flex justify-between items-center bg-[#FF3B30]/5">
-              <div>
-                <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Mission Index</div>
-                <div className="text-sm text-white font-bold">{projects.length} Projects</div>
-              </div>
-              <button
-                onClick={() => setShowSidebar(false)}
-                className="text-neutral-500 hover:text-white text-lg px-2 py-1 hover:bg-white/10 rounded-sm transition-colors"
-              >
-                ✕
-              </button>
-            </div>
+            {/* Main container with clip path */}
+            <div
+              className="relative h-full bg-black border-l-2 border-[#FF3B30]/40 flex flex-col overflow-hidden"
+              style={{
+                clipPath: "polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px)"
+              }}
+            >
+              {/* Scanline effect */}
+              <motion.div
+                className="absolute inset-0 pointer-events-none z-20"
+                style={{
+                  background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,59,48,0.03) 2px, rgba(255,59,48,0.03) 4px)"
+                }}
+              />
 
-            <div className="flex-1 overflow-y-auto">
-              {projects.map((project, index) => (
-                <button
-                  key={project.id}
-                  onClick={() => {
-                    setSelectedProject(project);
-                    setShowSidebar(false);
-                  }}
-                  className={cn(
-                    "w-full text-left px-4 py-3 border-b border-white/5 transition-colors",
-                    selectedProject?.id === project.id
-                      ? "bg-[#FF3B30]/10 border-l-2 border-l-[#FF3B30]"
-                      : "hover:bg-white/5"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="text-[10px] text-neutral-600 font-mono pt-0.5">
-                      {String(index + 1).padStart(2, '0')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "text-[9px] px-1.5 py-0.5 rounded-sm font-mono",
-                          project.status === "DEPLOYED" ? "bg-emerald-500/20 text-emerald-400" :
-                          project.status === "IN_PROGRESS" ? "bg-amber-500/20 text-amber-400" :
-                          "bg-neutral-500/20 text-neutral-400"
-                        )}>
-                          {project.status}
-                        </span>
-                      </div>
-                      <div className="text-sm text-white font-medium mt-1">{project.codename}</div>
-                      <div className="text-[10px] text-neutral-500 mt-0.5 truncate">{project.title}</div>
-                      <div className="text-[9px] text-neutral-600 mt-1">{project.id}</div>
-                    </div>
+              {/* Top corner cut decoration */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-b-2 border-r-2 border-[#FF3B30]" />
+
+              {/* Header */}
+              <div className="relative border-b-2 border-[#FF3B30]/30 px-5 py-4 bg-gradient-to-r from-[#FF3B30]/10 to-transparent z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      className="relative"
+                      animate={{ opacity: [1, 0.5, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <div className="w-1.5 h-1.5 bg-[#FF3B30]" />
+                      <div className="absolute inset-0 w-1.5 h-1.5 bg-[#FF3B30] animate-ping" />
+                    </motion.div>
+                    <GlitchText className="text-[8px] text-[#FF3B30] font-bold tracking-[0.25em]" delay={0}>
+                      MISSION DATABASE
+                    </GlitchText>
                   </div>
-                </button>
-              ))}
-            </div>
+                  <button
+                    onClick={() => setShowSidebar(false)}
+                    className="text-neutral-600 hover:text-[#FF3B30] text-[11px] w-6 h-6 flex items-center justify-center border border-neutral-800 hover:border-[#FF3B30] transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
 
-            <div className="border-t border-white/10 px-4 py-3 bg-black/50">
-              <div className="text-[9px] text-neutral-600 text-center">
-                SCROLL TO BROWSE • CLICK TO SELECT
+                <div className="flex items-baseline gap-3">
+                  <GlitchText className="text-[11px] text-neutral-500 uppercase tracking-[0.2em]" delay={0.05}>
+                    TOTAL RECORDS:
+                  </GlitchText>
+                  <GlitchText className="text-[18px] text-white font-bold tabular-nums" delay={0.1}>
+                    {String(projects.length).padStart(2, '0')}
+                  </GlitchText>
+                </div>
+
+                <div className="mt-2 text-[7px] text-neutral-700 uppercase tracking-[0.2em]">
+                  CLEARANCE: OMEGA • ACCESS GRANTED
+                </div>
               </div>
+
+              {/* Projects list */}
+              <div className="flex-1 overflow-y-auto relative z-10">
+                {projects.map((project, index) => (
+                  <motion.button
+                    key={project.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05, duration: 0.3 }}
+                    onClick={() => {
+                      setSelectedProject(project);
+                      setShowSidebar(false);
+                    }}
+                    className={cn(
+                      "w-full text-left px-5 py-3 border-b border-neutral-900 transition-all relative group",
+                      selectedProject?.id === project.id
+                        ? "bg-[#FF3B30]/10 border-l-[3px] border-l-[#FF3B30]"
+                        : "hover:bg-neutral-900/50 border-l-[3px] border-l-transparent hover:border-l-[#FF3B30]/50"
+                    )}
+                  >
+                    {/* Hover glow effect */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-[#FF3B30]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                      initial={false}
+                    />
+
+                    <div className="relative flex items-start gap-3">
+                      {/* Index number */}
+                      <div className="flex flex-col items-center gap-1 pt-1">
+                        <span className="text-[10px] text-neutral-700 font-mono font-bold">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <div className="w-px h-8 bg-gradient-to-b from-neutral-800 to-transparent" />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        {/* Status badge and indicators */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <motion.div
+                            className={cn(
+                              "w-1.5 h-1.5",
+                              project.status === "DEPLOYED" ? "bg-[#00ff00]" :
+                                project.status === "IN_PROGRESS" ? "bg-[#ffaa00]" :
+                                  "bg-neutral-600"
+                            )}
+                            animate={{
+                              opacity: project.status === "DEPLOYED" ? [1, 0.3, 1] : 1
+                            }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          />
+                          <span className={cn(
+                            "text-[8px] px-1.5 py-0.5 border font-mono uppercase tracking-wider",
+                            project.status === "DEPLOYED" ? "border-[#00ff00]/30 text-[#00ff00] bg-[#00ff00]/5" :
+                              project.status === "IN_PROGRESS" ? "border-[#ffaa00]/30 text-[#ffaa00] bg-[#ffaa00]/5" :
+                                "border-neutral-700 text-neutral-500 bg-neutral-900/30"
+                          )}>
+                            {project.status}
+                          </span>
+                        </div>
+
+                        {/* Codename */}
+                        <div className="text-[13px] text-white font-bold tracking-wide mb-1 group-hover:text-[#FF3B30] transition-colors">
+                          {project.codename}
+                        </div>
+
+                        {/* Title */}
+                        <div className="text-[10px] text-neutral-400 leading-tight mb-2 line-clamp-2">
+                          {project.title}
+                        </div>
+
+                        {/* ID and classification */}
+                        <div className="flex items-center gap-2 text-[8px]">
+                          <span className="text-neutral-700 font-mono">ID:{project.id}</span>
+                          <span className="text-neutral-800">•</span>
+                          <span className="text-neutral-600 uppercase tracking-wider">
+                            {project.classification || "GENERAL"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Arrow indicator on hover/selected */}
+                      {(selectedProject?.id === project.id || undefined) && (
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="text-[#FF3B30] text-[10px] pt-2"
+                        >
+                          ▸
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="relative border-t-2 border-[#FF3B30]/30 px-5 py-3 bg-black/90 z-10">
+                <div className="flex items-center justify-between mb-1">
+                  <GlitchText className="text-[7px] text-neutral-700 uppercase tracking-[0.2em]" delay={0}>
+                    CONTROLS
+                  </GlitchText>
+                  <GlitchText className="text-[7px] text-neutral-700 font-mono" delay={0.05}>
+                    {timestamp.split(' ')[1]}
+                  </GlitchText>
+                </div>
+                <div className="text-[8px] text-neutral-600 uppercase tracking-[0.15em]">
+                  SCROLL: BROWSE • CLICK: SELECT • ESC: CLOSE
+                </div>
+              </div>
+
+              {/* Bottom corner cut decoration */}
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-t-2 border-l-2 border-[#FF3B30]" />
             </div>
           </motion.div>
         )}

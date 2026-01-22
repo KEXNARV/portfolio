@@ -38,16 +38,25 @@ model Profile {
 }
 
 model Project {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String
-  imageUrl    String?
-  techStack   String[] // Array of strings: ["Next.js", "NestJS"]
-  demoUrl     String?
-  repoUrl     String?
-  featured    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  slug           String?  @unique // Unique token for URL (e.g., "x7k2p9m4")
+  title          String
+  description    String
+  imageUrl       String?
+  techStack      String[] // Array of strings: ["Next.js", "NestJS"]
+  demoUrl        String?
+  repoUrl        String?
+  featured       Boolean  @default(false)
+  // Industrial theme fields
+  codename       String?  // Short code like "CORTEX", "NEXUS"
+  status         String?  // "DEPLOYED", "IN_PROGRESS", "ARCHIVED"
+  classification String?  // "MACHINE LEARNING", "DISTRIBUTED SYSTEMS"
+  problem        String?  // The challenge/glitch
+  solution       String?  // The patch/fix
+  impact         String?  // The efficiency/result
+  metrics        Json?    // Array of {label, value}
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Skill {

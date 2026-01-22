@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 interface HeroData {
   title: string;
   subtitle: string;
+  location?: string;
   description: string;
   ctaPrimary: {
     text: string;
@@ -26,14 +27,15 @@ interface HeroData {
 const defaultHeroData: HeroData = {
   title: "Kevin Narvaez",
   subtitle: "AI Product System Engineer",
+  location: "Panama",
   description: "I architect the bridge between AI research and production systems. Building the infrastructure that turns AI potential into business impact.",
   ctaPrimary: {
     text: "View Projects",
-    link: "#projects"
+    link: "#systems"
   },
   ctaSecondary: {
-    text: "Contact Me",
-    link: "#contact"
+    text: "About Me",
+    link: "#architect"
   },
   backgroundType: "solid",
   backgroundColor: "#0a0a0a",
@@ -123,7 +125,8 @@ export default function HeroAdmin() {
 
       if (response.ok) {
         const data = await response.json();
-        updateField('backgroundImage', `http://localhost:3001${data.url}`);
+        // MinIO returns full URL, use it directly
+        updateField('backgroundImage', data.url);
       } else {
         alert('Error al subir la imagen');
       }
@@ -236,6 +239,19 @@ export default function HeroAdmin() {
 
             <div>
               <label className="block text-sm text-neutral-400 mb-2">
+                Ubicación
+              </label>
+              <input
+                type="text"
+                value={heroData.location || ""}
+                onChange={(e) => updateField("location", e.target.value)}
+                className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-[#FF3B30] transition-colors"
+                placeholder="Ej: Panama"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-neutral-400 mb-2">
                 Descripción
               </label>
               <textarea
@@ -274,7 +290,7 @@ export default function HeroAdmin() {
                   value={heroData.ctaPrimary.link}
                   onChange={(e) => updateCTA("ctaPrimary", "link", e.target.value)}
                   className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#FF3B30]"
-                  placeholder="#projects"
+                  placeholder="#systems (IDs disponibles: #architect, #systems)"
                 />
               </div>
             </div>
@@ -299,7 +315,7 @@ export default function HeroAdmin() {
                   value={heroData.ctaSecondary.link}
                   onChange={(e) => updateCTA("ctaSecondary", "link", e.target.value)}
                   className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#FF3B30]"
-                  placeholder="#contact"
+                  placeholder="#architect (IDs disponibles: #architect, #systems)"
                 />
               </div>
             </div>
@@ -475,10 +491,10 @@ export default function HeroAdmin() {
                   heroData.backgroundType === "solid"
                     ? heroData.backgroundColor
                     : heroData.backgroundType === "gradient"
-                    ? `linear-gradient(135deg, ${heroData.gradientFrom}, ${heroData.gradientTo})`
-                    : heroData.backgroundImage
-                    ? `url(${heroData.backgroundImage}) center/cover`
-                    : "#0a0a0a"
+                      ? `linear-gradient(135deg, ${heroData.gradientFrom}, ${heroData.gradientTo})`
+                      : heroData.backgroundImage
+                        ? `url(${heroData.backgroundImage}) center/cover`
+                        : "#0a0a0a"
               }}
             >
               <span className="text-white/50 text-sm">Preview del fondo</span>

@@ -21,8 +21,12 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ProjectDto> {
-    return this.projectsService.findOne(id);
+  async findOne(@Param('id') id: string): Promise<ProjectDto> {
+    // Try to find by slug first, fallback to numeric ID for backwards compatibility
+    if (isNaN(Number(id))) {
+      return this.projectsService.findBySlug(id);
+    }
+    return this.projectsService.findOne(Number(id));
   }
 
   @Post()
@@ -41,5 +45,10 @@ export class ProjectsController {
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number): Promise<{ deleted: boolean }> {
     return this.projectsService.remove(id);
+  }
+
+  @Post('generate-slugs')
+  async generateSlugs(): Promise<{ message: string; updated: number }> {
+    return this.projectsService.generateSlugs();
   }
 }

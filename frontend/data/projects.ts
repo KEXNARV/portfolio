@@ -1,3 +1,4 @@
+
 export interface Project {
   id: string;
   codename: string;
@@ -14,6 +15,10 @@ export interface Project {
   }[];
   link?: string;
   github?: string;
+  imageUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  featured?: boolean;
 }
 
 export const projects: Project[] = [
@@ -94,10 +99,11 @@ export const skills = {
 export const profile = {
   name: "Kevin Narvaez",
   role: "AI Product System Engineer",
-  location: "Ecuador",
+  location: "Panama",
   bio: "I architect the bridge between AI research and production systems. With a background in distributed systems and machine learning, I specialize in taking models from notebook to scale—building the infrastructure that turns AI potential into business impact.",
   years: 5,
   email: "contact@knarvaez.com",
   github: "https://github.com/knarvaez",
-  linkedin: "https://linkedin.com/in/knarvaez"
+  linkedin: "https://linkedin.com/in/knarvaez",
+  image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1887&auto=format&fit=crop"
 };

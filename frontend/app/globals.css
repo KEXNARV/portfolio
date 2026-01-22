@@ -46,6 +46,7 @@
   --radius-4xl: calc(var(--radius) + 16px);
   --animate-marquee: marquee 25s linear infinite;
   --animate-blob: blob 7s infinite;
+  --animate-scan: scan 4s linear infinite;
 
   @keyframes marquee {
     from { transform: translateX(0); }
@@ -58,10 +59,34 @@
     66% { transform: translate(-20px, 20px) scale(0.9); }
     100% { transform: translate(0px, 0px) scale(1); }
   }
+  
+  @keyframes scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
 }
 
 .text-shadow-glow {
   text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+}
+
+/* Custom Scrollbar for Cyberpunk Theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 59, 48, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 59, 48, 0.6);
 }
 
 :root {
