@@ -46,7 +46,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useArrivalSound } from "@/hooks/use-arrival-sound";
-import { projects as staticProjects, skills, profile } from "@/data/projects";
+import { projects as staticProjects, skills, profile } from "@/data/projects`;
+import { API_URL } from "@/lib/config";
 import { GridScan } from "@/components/GridScan";
 
 import { MissionIndex3D } from "@/components/MissionIndex3D";
@@ -3436,7 +3437,7 @@ export default function Landing1() {
   useEffect(() => {
     const fetchHeroData = async () => {
       try {
-        const response = await fetch("http://localhost:3001/hero");
+        const response = await fetch(`${API_URL}/hero`);
         if (response.ok) {
           const data = await response.json();
           setHeroData(data);
@@ -3461,7 +3462,7 @@ export default function Landing1() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await fetch("http://localhost:3001/projects");
+        const response = await fetch(`${API_URL}/projects`);
         if (response.ok) {
           const data = await response.json();
           // Map API data to match the structure expected by the landing page

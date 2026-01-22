@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Sparkles, Save, Eye, Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/lib/config";
 
 interface HeroData {
   title: string;
@@ -56,7 +57,7 @@ export default function HeroAdmin() {
   useEffect(() => {
     const loadHeroData = async () => {
       try {
-        const response = await fetch("http://localhost:3001/hero");
+        const response = await fetch(`${API_URL}/hero`);
         if (response.ok) {
           const data = await response.json();
           setHeroData(data);
@@ -71,7 +72,7 @@ export default function HeroAdmin() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch("http://localhost:3001/hero", {
+      const response = await fetch(`${API_URL}/hero`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -118,7 +119,7 @@ export default function HeroAdmin() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:3001/uploads', {
+      const response = await fetch(`${API_URL}/uploads`, {
         method: 'POST',
         body: formData,
       });

@@ -15,6 +15,7 @@ import {
   Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { API_URL } from "@/lib/config";
 
 interface Project {
   id: number;
@@ -84,8 +85,6 @@ export default function ProjectsAdmin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const API_URL = "http://localhost:3001";
 
   useEffect(() => {
     fetchProjects();
