@@ -46,7 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useArrivalSound } from "@/hooks/use-arrival-sound";
-import { projects as staticProjects, skills, profile } from "@/data/projects`;
+import { projects as staticProjects, skills, profile } from "@/data/projects";
 import { API_URL } from "@/lib/config";
 import { GridScan } from "@/components/GridScan";
 
